@@ -22,7 +22,7 @@
 | **무엇을** | 판매자가 상품과 할인 규칙을 올리면, 구매자가 모여 공동구매에 참여. 인원이 늘수록 단가가 내려가고 마감 시점 가격으로 전원 확정 |
 | **왜** | 동시 참여 · 실시간 가격 변동 · 마감 정산을 **Redis**로 풀고, DB만 썼을 때와 **수치로 비교**하는 백엔드 중심 개인 프로젝트 |
 | **핵심 포인트** | ① 선착순 참여 원자 처리 (Lua) ② 인원 → 단가 실시간 반영 ③ 마감 시 Redis → MySQL 정산 |
-| **기간** | 2026.10 ~ 2027.01 (개인) |
+| **기간** | 2026.10 ~ 2026.12 (개인) |
 
 > 대파 한 단 **3,000원** · 10명마다 5% 할인 → 10명 모이면 **2,850원** → 20명 모이면 **2,700원** … 하한가 **2,500원**
 
@@ -48,7 +48,7 @@
 | # | 목표 | 어떻게 |
 |---|---|---|
 | 1 | **동시성 제어** — 수천 명 동시 참여에도 초과 참여 0건 | DB 비관적 락 / Redisson 분산락 / Redis Lua 를 같은 조건에서 k6 비교 |
-| 2 | **실시간 가격 반영** — 인원 변동 즉시 모든 참여자 화면 갱신 | Lua에서 할인 규칙으로 단가 계산 + Pub/Sub → STOMP |
+| 2 | **실시간 가격 반영** — 인원 변동 즉시 구독자에게 전달 | Lua에서 할인 규칙으로 단가 계산 + Pub/Sub → STOMP |
 | 3 | **마감 정산 정합성** — 정원 달성 · 시간 만료 두 조건 모두 누락 없이 저장 | TTL + Keyspace Notification + 스케줄러 보정 |
 | 4 | **알림 유실 방지** — 구독 · 마감 · 취소 알림 재처리 | Redis Streams + Consumer Group |
 | 5 | **배포 자동화** | GitHub Actions → EC2 Docker Compose |
@@ -62,7 +62,7 @@
 | **Backend** | Java 21 · Spring Boot 3.x · Spring Data JPA · Querydsl |
 | **Database** | MySQL 8 |
 | **Cache / Messaging** | Redis — Lua Script · Hash · Set · Streams · Pub/Sub · Keyspace Notification · Spring Session |
-| **View** | Thymeleaf · Vanilla JS · STOMP (WebSocket) · SSE |
+| **Realtime** | STOMP (WebSocket) · SSE |
 | **Infra** | AWS EC2 · S3 · Docker Compose · Nginx |
 | **CI/CD** | GitHub Actions |
 | **Test** | JUnit 5 · Testcontainers · k6 |
@@ -73,7 +73,7 @@
 
 ```mermaid
 flowchart LR
-    U[사용자 브라우저]
+    U[클라이언트]
 
     subgraph AWS["AWS"]
         subgraph EC2["EC2 (Docker Compose)"]
@@ -116,7 +116,7 @@ flowchart TB
 | 저장소 | 역할 |
 |---|---|
 | **Redis** | 진행 중인 공동구매의 참여자 · 인원 · 현재 단가 · 할인 규칙 사본 (빠르게 변하는 상태), 로그인 세션 |
-| **MySQL** | 회원, 공동구매 등록 정보, 참여 이력, **마감 후 확정된** 최종 단가 · 참여자별 주문, 알림함 |
+| **MySQL** | 회원, 공동구매 등록 정보, 참여 이력, **마감 후 확정된** 최종 인원 · 단가, 알림함 |
 | **S3** | 상품 이미지 파일 (DB에는 URL만 저장) |
 
 ---
@@ -137,7 +137,7 @@ sequenceDiagram
     R-->>S: 성공(인원, 단가) / 정원초과 / 중복
     S->>M: participation INSERT
     S->>R: PUBLISH (인원, 단가)
-    R-->>U: STOMP 화면 갱신 (보고 있는 사람 전원)
+    R-->>U: STOMP 실시간 갱신 (구독 중인 전원)
 
     alt 정원 달성
         S->>S: 즉시 마감
@@ -146,9 +146,9 @@ sequenceDiagram
     end
 
     S->>R: 최종 인원 · 단가 조회
-    S->>M: groupbuy 최종 값 저장 + 참여자별 orders 일괄 INSERT
+    S->>M: UPDATE group_purchase 최종 값 (status가 OPEN일 때만)
     S->>R: XADD 마감 알림
-    Note over S,M: 스케줄러가 미정산 건 보정 · orders는 참여당 1건(중복 방지)
+    Note over S,M: 바뀐 행이 1개일 때만 알림 → 중복 마감 방지 · 스케줄러가 미정산 건 보정
 ```
 
 ### 알림
@@ -157,7 +157,7 @@ sequenceDiagram
 flowchart LR
     E["공동구매 등록 · 마감 · 취소"] --> X["XADD<br/>Streams"]
     X --> CG["Consumer Group<br/>워커"]
-    CG --> DB["받을 사람 조회 (MySQL)<br/>구독자 · 참여자"]
+    CG --> DB["받을 사람 조회 (MySQL)<br/>관심 카테고리 회원 · 참여자"]
     DB --> SAVE["알림함 저장"]
     SAVE --> SSE["SSE 실시간 알림"]
     CG -. 실패 시 .-> PEL["PEL 재처리 (XAUTOCLAIM)"]
@@ -167,28 +167,16 @@ flowchart LR
 
 ## ERD
 
-```mermaid
-erDiagram
-    member ||--o{ category_subscription : "구독"
-    category ||--o{ category_subscription : "구독자"
-    member ||--o{ groupbuy : "판매"
-    category ||--o{ groupbuy : "분류"
-    groupbuy ||--|{ groupbuy_image : "이미지"
-    groupbuy ||--o{ participation : "참여"
-    member ||--o{ participation : "참여"
-    participation ||--o| orders : "정산"
-    groupbuy ||--o{ orders : "주문"
-    member ||--o{ notification : "알림"
-```
+**[dbdiagram에서 보기 →](https://dbdiagram.io/d/ttuk-6add7c04aac3301410110c0a)**
 
 | 테이블 | 역할 |
 |---|---|
 | member | 회원 (구매자 · 판매자) |
-| category · category_subscription | 상품 종류와 구독 (N:M) |
-| groupbuy | 공동구매 본체 · 할인 규칙 · 마감/취소 시점 최종 값 |
-| groupbuy_image | 상품 이미지 URL (최대 5장) |
-| participation | 참여 기록 (취소 이력 포함) |
-| orders | 구매자별 주문서 (마감 때 참여 1건 = 주문 1건) |
+| category | 상품 종류 (야채 · 과일 · 생선 · 가전 …) |
+| member_category | 회원 관심 카테고리 (member ↔ category 매핑) |
+| group_purchase | 공동구매 본체 · 할인 규칙 · 마감/취소 시점 최종 값 |
+| group_purchase_image | 상품 이미지 URL (최대 5장) |
+| participation | 참여 기록 (취소 이력 포함) · 마감 후 JOINED 참여 = 주문 |
 | notification | 알림함 |
 
 ---
@@ -207,14 +195,14 @@ erDiagram
 - 카테고리 선택 후 공동구매 등록
   - 기본가 · 하한가 · 할인 규칙 (몇 명마다 몇 % / 몇 원)
   - 정원(제한/무제한) · 마감 시각 · 이미지 1~5장
-- 등록 즉시 구독자 알림 발송
+- 등록 즉시 관심 카테고리 회원에게 알림
 - 내 판매 목록 · 판매 상세 (참여자 명단)
 - 공동구매 취소 (사유 입력 → 참여자 알림)
 
 </td>
 <td valign="top">
 
-- 카테고리 구독 · 알림 수신
+- 관심 카테고리 등록 · 알림 수신
 - 목록 · 상세 조회
   (현재 인원 · 현재 단가 · 다음 할인까지 남은 인원)
 - 참여 / 취소 (마감 1시간 전까지), 취소 후 재참여
@@ -227,7 +215,7 @@ erDiagram
 - 선착순 참여 원자 처리
 - 인원 변동 시 실시간 단가 방송
 - 정원 달성 / 시간 만료 자동 마감
-- 마감 시 MySQL 정산 저장
+- 마감 시 MySQL에 최종 인원 · 단가 확정
 - 목록 · 상세 캐시 및 갱신
 
 </td>
@@ -255,26 +243,3 @@ _결과 그래프 첨부 예정_
 
 > 개발 진행하며 정리
 
----
-
-## 고민한 부분 / 한계
-
-- Redis 장애 시 참여 요청 처리 — 차단 vs DB 폴백
-- 분산락 TTL 만료 중 작업이 길어지는 경우 — Redisson Watchdog
-- 캐시와 DB 불일치 시나리오
-- 참여 취소 시 단가가 다시 오르는 문제 — 마감 1시간 전부터 취소 불가로 제한
-- 할인 방식 — 구간표 직접 입력 vs 규칙(몇 명마다 몇 %) 입력 → 입력이 단순하고 테이블 · Redis 키가 줄어드는 규칙 방식 선택
-- 참여 버튼 연타 · 매크로 방어 (Rate Limiter) — 미구현
-
----
-
-## 실행 방법
-
-```bash
-git clone https://github.com/<id>/ttuk.git
-cd ttuk
-docker compose up -d        # mysql, redis
-./gradlew bootRun
-```
-
-접속: http://localhost:8080
