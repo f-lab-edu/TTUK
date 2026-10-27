@@ -1,0 +1,16 @@
+spring:
+  application:
+    name: ttuk
+  profiles:
+    active: local
+  docker:
+    compose:
+      enabled: false
+  jpa:
+    open-in-view: false
+    properties:
+      hibernate:
+        format_sql: true
+        default_batch_fetch_size: 100
+        jdbc:
+          time_zone: Asia/Seoul
