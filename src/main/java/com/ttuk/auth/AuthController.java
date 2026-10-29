@@ -2,8 +2,8 @@ package com.ttuk.auth;
 
 import com.ttuk.global.auth.Login;
 import com.ttuk.global.auth.LoginMember;
-import com.ttuk.global.auth.dto.LoginRequest;
-import com.ttuk.global.auth.dto.LoginResponse;
+import com.ttuk.auth.dto.LoginRequest;
+import com.ttuk.auth.dto.LoginResponse;
 import com.ttuk.global.response.ApiResponse;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpSession;

@@ -1,7 +1,7 @@
 package com.ttuk.auth;
 
-import com.ttuk.global.auth.dto.LoginRequest;
-import com.ttuk.global.auth.dto.LoginResponse;
+import com.ttuk.auth.dto.LoginRequest;
+import com.ttuk.auth.dto.LoginResponse;
 import com.ttuk.global.error.BusinessException;
 import com.ttuk.global.error.ErrorCode;
 import com.ttuk.member.Member;

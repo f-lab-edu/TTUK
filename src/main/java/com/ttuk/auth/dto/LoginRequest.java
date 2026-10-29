@@ -1,4 +1,4 @@
-package com.ttuk.global.auth.dto;
+package com.ttuk.auth.dto;
 
 import jakarta.validation.constraints.NotBlank;
 

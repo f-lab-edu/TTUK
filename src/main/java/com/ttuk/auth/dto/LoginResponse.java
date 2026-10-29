@@ -1,4 +1,4 @@
-package com.ttuk.global.auth.dto;
+package com.ttuk.auth.dto;
 
 import com.ttuk.member.Member;
 import com.ttuk.member.MemberRole;
