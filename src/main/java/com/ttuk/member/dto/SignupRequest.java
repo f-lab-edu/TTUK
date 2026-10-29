@@ -1,6 +1,5 @@
 package com.ttuk.member.dto;
 
-import com.ttuk.auth.dto.PasswordPolicy;
 import com.ttuk.member.Member;
 import com.ttuk.member.MemberRole;
 import jakarta.validation.constraints.*;

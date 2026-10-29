@@ -1,6 +1,5 @@
 package com.ttuk.member.dto;
 
-import com.ttuk.auth.dto.PasswordPolicy;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 

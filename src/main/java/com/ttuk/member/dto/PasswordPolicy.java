@@ -1,4 +1,4 @@
-package com.ttuk.auth.dto;
+package com.ttuk.member.dto;
 
 public final class PasswordPolicy {
 
