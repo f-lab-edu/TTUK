@@ -1,5 +1,6 @@
 package com.ttuk.member.dto;
 
+import com.ttuk.auth.dto.PasswordPolicy;
 import com.ttuk.member.Member;
 import com.ttuk.member.MemberRole;
 import jakarta.validation.constraints.*;
@@ -12,8 +13,7 @@ public record SignupRequest(
         String email,
 
         @NotBlank(message = "비밀번호를 입력해 주세요.")
-        @Pattern(regexp = "^(?=.*[A-Za-z])(?=.*\\d).{10,30}$",
-                message = "비밀번호는 영문과 숫자를 포함해 10~30자여야 합니다.")
+        @Pattern(regexp = PasswordPolicy.REGEX, message = PasswordPolicy.MESSAGE)
         String password,
 
         @NotBlank(message = "닉네임을 입력해 주세요.")
