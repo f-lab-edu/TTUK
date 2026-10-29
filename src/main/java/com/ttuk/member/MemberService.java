@@ -2,6 +2,7 @@ package com.ttuk.member;
 
 import com.ttuk.global.error.BusinessException;
 import com.ttuk.global.error.ErrorCode;
+import com.ttuk.member.dto.PasswordChangeRequest;
 import com.ttuk.member.dto.SignupRequest;
 import com.ttuk.member.dto.SignupResponse;
 import lombok.RequiredArgsConstructor;
@@ -42,6 +43,28 @@ public class MemberService {
         return new SignupResponse(member.getId());
 
     }
+
+    @Transactional
+    public void changePassword(Long memberId, PasswordChangeRequest request) {
+
+        Member member = memberRepository.findById(memberId).orElse(null);
+        if(member == null){
+            throw new BusinessException(ErrorCode.UNAUTHORIZED);
+        }
+
+        if(!passwordEncoder.matches(request.currentPassword(), member.getPassword())){
+            throw new BusinessException(ErrorCode.INVALID_CURRENT_PASSWORD);
+        }
+
+        if(request.newPassword().equals(request.currentPassword())){
+            throw new BusinessException(ErrorCode.SAME_AS_CURRENT_PASSWORD);
+        }
+
+        member.changerPassword(passwordEncoder.encode(request.newPassword()));
+        log.info("비밀번호 변경 memberId : {}", memberId);
+
+    }
+
 
     private boolean isDuplicateEmail(DataIntegrityViolationException e) {
         String message = e.getMostSpecificCause().getMessage();
