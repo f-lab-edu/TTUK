@@ -14,3 +14,8 @@ spring:
         default_batch_fetch_size: 100
         jdbc:
           time_zone: Asia/Seoul
+  session:
+    timeout: 30m
+    data:
+      redis:
+        repository-type: indexed
