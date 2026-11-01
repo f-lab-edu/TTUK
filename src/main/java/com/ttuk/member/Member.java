@@ -51,14 +51,32 @@ public class Member extends BaseTimeEntity {
         this.password = encodedPassword;
         this.nickname = nickname;
         this.role = role;
-        this.phoneNum = phoneNum.replaceAll("[^0-9]", "");
+        this.phoneNum = normalizePhoneNum(phoneNum);
         this.zipCode = zipCode;
         this.address = address;
         this.addressDetail = addressDetail;
     }
 
-    public void changerPassword(String encodedPassword){
+    public void changePassword(String encodedPassword){
         this.password = encodedPassword;
+    }
+
+    public void changeNickName(String nickname){
+        this.nickname = nickname;
+    }
+
+    public void changePhoneNum(String phoneNum){
+        this.phoneNum = normalizePhoneNum(phoneNum);
+    }
+
+    public void changeAddress(String zipCode, String address, String addressDetail){
+        this.zipCode = zipCode;
+        this.address = address;
+        this.addressDetail = addressDetail;
+    }
+
+    private static String normalizePhoneNum(String phoneNum){
+        return phoneNum.replaceAll("\\D", "");
     }
 
 }

@@ -4,9 +4,7 @@ import com.ttuk.global.auth.Login;
 import com.ttuk.global.auth.LoginMember;
 import com.ttuk.global.auth.LoginSessionManager;
 import com.ttuk.global.response.ApiResponse;
-import com.ttuk.member.dto.PasswordChangeRequest;
-import com.ttuk.member.dto.SignupRequest;
-import com.ttuk.member.dto.SignupResponse;
+import com.ttuk.member.dto.*;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpSession;
 import jakarta.validation.Valid;
@@ -47,6 +45,17 @@ public class MemberController {
         return ResponseEntity.noContent().build();
     }
 
+    @GetMapping("/me")
+    public ResponseEntity<ApiResponse<MyInfoResponse>> getMyInfo(@Login LoginMember loginMember) {
+        MyInfoResponse response = memberService.getMyInfo(loginMember.memberId());
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
 
+    @PatchMapping("/me")
+    public ResponseEntity<ApiResponse<MyInfoResponse>> updateMyInfo(@Login LoginMember loginMember,
+                                                                    @Valid @RequestBody MemberUpdateRequest request){
+        MyInfoResponse response = memberService.updateMyInfo(loginMember.memberId(), request);
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
 
 }
