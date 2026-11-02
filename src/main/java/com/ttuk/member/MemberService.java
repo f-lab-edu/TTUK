@@ -10,6 +10,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 @Slf4j
@@ -21,7 +22,7 @@ public class MemberService {
     private final MemberRepository memberRepository;
     private final PasswordEncoder passwordEncoder;
 
-    @Transactional
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public SignupResponse signup(SignupRequest request) {
         if(memberRepository.existsByEmail(request.email())){
             throw new BusinessException(ErrorCode.DUPLICATE_EMAIL);
