@@ -3,16 +3,15 @@ package com.ttuk.member;
 import com.ttuk.global.error.BusinessException;
 import com.ttuk.global.error.ErrorCode;
 import com.ttuk.member.dto.*;
+import com.ttuk.member.dto.MemberUpdateRequest.AddressRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
-
-import com.ttuk.member.dto.MemberUpdateRequest;
-
-import static com.ttuk.member.dto.MemberUpdateRequest.*;
+import org.springframework.transaction.support.TransactionTemplate;
 
 @Slf4j
 @Service
@@ -22,8 +21,9 @@ public class MemberService {
 
     private final MemberRepository memberRepository;
     private final PasswordEncoder passwordEncoder;
+    private final TransactionTemplate transactionTemplate;
 
-    @Transactional
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public SignupResponse signup(SignupRequest request) {
         if(memberRepository.existsByEmail(request.email())){
             throw new BusinessException(ErrorCode.DUPLICATE_EMAIL);
@@ -46,22 +46,26 @@ public class MemberService {
 
     }
 
-    @Transactional
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public void changePassword(Long memberId, PasswordChangeRequest request) {
 
         Member member = findMember(memberId);
 
-        if(!passwordEncoder.matches(request.currentPassword(), member.getPassword())){
+        if (!passwordEncoder.matches(request.currentPassword(), member.getPassword())) {
             throw new BusinessException(ErrorCode.INVALID_CURRENT_PASSWORD);
         }
-
-        if(request.newPassword().equals(request.currentPassword())){
+        if (request.newPassword().equals(request.currentPassword())) {
             throw new BusinessException(ErrorCode.SAME_AS_CURRENT_PASSWORD);
         }
 
-        member.changePassword(passwordEncoder.encode(request.newPassword()));
-        log.info("비밀번호 변경 memberId : {}", memberId);
+        String encodedPassword = passwordEncoder.encode(request.newPassword());
 
+        transactionTemplate.executeWithoutResult(status -> {
+            Member target = findMember(memberId);
+            target.changePassword(encodedPassword);
+        });
+
+        log.info("비밀번호 변경 memberId : {}", memberId);
     }
 
     public MyInfoResponse getMyInfo(Long memberId) {
@@ -92,7 +96,6 @@ public class MemberService {
 
     }
 
-
     private Member findMember(Long memberId){
         Member member = memberRepository.findById(memberId).orElse(null);
         if(member == null){
@@ -100,7 +103,6 @@ public class MemberService {
         }
         return member;
     }
-
 
     private boolean isDuplicateEmail(DataIntegrityViolationException e) {
         String message = e.getMostSpecificCause().getMessage();

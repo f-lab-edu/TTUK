@@ -2,9 +2,13 @@ package com.ttuk.global.error;
 
 import com.ttuk.global.response.ApiResponse;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.TypeMismatchException;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.validation.FieldError;
+import org.springframework.web.ErrorResponse;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -40,8 +44,26 @@ public class GlobalExceptionHandler {
         return fail(ErrorCode.METHOD_NOT_ALLOWED, ErrorCode.METHOD_NOT_ALLOWED.getMessage());
     }
 
+    @ExceptionHandler(TypeMismatchException.class)
+    public ResponseEntity<ApiResponse<Void>> handleTypeMismatch(TypeMismatchException e) {
+        return fail(ErrorCode.INVALID_INPUT, ErrorCode.INVALID_INPUT.getMessage());
+    }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiResponse<Void>> handleUnexpected(Exception e) {
+        if (e instanceof ErrorResponse errorResponse) {
+            HttpStatusCode statusCode = errorResponse.getStatusCode();
+            if (statusCode.is5xxServerError()) {
+                log.error("스프링 처리 중 서버 오류", e);
+            }
+            HttpStatus status = HttpStatus.resolve(statusCode.value());
+            return ResponseEntity.status(statusCode)
+                    .headers(errorResponse.getHeaders())
+                    .body(ApiResponse.fail(
+                            status != null ? status.name() : String.valueOf(statusCode.value()),
+                            status != null ? status.getReasonPhrase() : "Error"));
+        }
+
         log.error("처리되지 않은 예외", e);
         return fail(ErrorCode.INTERNAL_ERROR, ErrorCode.INTERNAL_ERROR.getMessage());
     }
