@@ -61,7 +61,7 @@ public class MemberService {
             throw new BusinessException(ErrorCode.SAME_AS_CURRENT_PASSWORD);
         }
 
-        member.changerPassword(passwordEncoder.encode(request.newPassword()));
+        member.changePassword(passwordEncoder.encode(request.newPassword()));
         log.info("비밀번호 변경 memberId : {}", memberId);
 
     }
