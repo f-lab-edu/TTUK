@@ -103,16 +103,16 @@ public class MemberPasswordChangeIntegrationTest {
     }
 
     @Test
-    @DisplayName("변경을 요청한 기기의 세션 키가 Redis에 다시 생기지 않는다 (invalidate 확인)")
+    @DisplayName("변경을 요청한 기기의 세션 키가 Redis에서 삭제된다 (invalidate 확인)")
     void changePassword_currentSessionNotRecreated() throws Exception {
 
         Cookie sessionCookie = loginAndGetCookie(OLD_PASSWORD);
         String sessionId = new String(Base64.getDecoder().decode(sessionCookie.getValue()));
+        String sessionKey = "spring:session:sessions:" + sessionId;
 
+        assertThat(redisTemplate.hasKey(sessionKey)).isTrue();
         changePassword(sessionCookie, OLD_PASSWORD, NEW_PASSWORD).andExpect(status().isNoContent());
-
-        assertThat(redisTemplate.hasKey("spring:session:session:" + sessionId)).isFalse();
-
+        assertThat(redisTemplate.hasKey(sessionKey)).isFalse();
     }
 
     @Test
