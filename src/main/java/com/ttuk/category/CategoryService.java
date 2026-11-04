@@ -71,7 +71,7 @@ public class CategoryService {
 
     @Transactional
     public void unsubscribe(Long memberId, Long categoryId){
-        int deletedCount = memberCategoryRepository.deletebyMemberIdAndCategoryId(memberId, categoryId);
+        int deletedCount = memberCategoryRepository.deleteByMemberIdAndCategoryId(memberId, categoryId);
         if(deletedCount == 0){
             throw new BusinessException(ErrorCode.SUBSCRIPTION_NOT_FOUND);
         }
