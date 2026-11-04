@@ -16,6 +16,6 @@ public interface MemberCategoryRepository extends JpaRepository<MemberCategory, 
 
     @Modifying
     @Query("delete from MemberCategory mc where mc.member.id = :memberId and mc.category.id = :categoryId")
-    int deletebyMemberIdAndCategoryId(@Param("memberId") Long memberId, @Param("categoryId") Long categoryId);
+    int deleteByMemberIdAndCategoryId(@Param("memberId") Long memberId, @Param("categoryId") Long categoryId);
 
 }
