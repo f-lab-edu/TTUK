@@ -5,6 +5,7 @@ import com.ttuk.global.auth.Login;
 import com.ttuk.global.auth.LoginMember;
 import com.ttuk.global.response.ApiResponse;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.java.Log;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -29,6 +30,13 @@ public class CategoryController {
                                           @PathVariable Long categoryId){
         categoryService.subscribe(loginMember.memberId(), categoryId);
         return ResponseEntity.status(HttpStatus.CREATED).build();
+    }
+
+    @DeleteMapping("/{categoryId}/subscriptions")
+    public ResponseEntity<Void> unsubscribe(@Login LoginMember loginMember,
+                                            @PathVariable Long categoryId){
+        categoryService.unsubscribe(loginMember.memberId(), categoryId);
+        return ResponseEntity.noContent().build();
     }
 
 }

@@ -69,12 +69,20 @@ public class CategoryService {
         log.info("카테고리 구독 memberId : {}, categoryId : {}", memberId, categoryId);
     }
 
+    @Transactional
+    public void unsubscribe(Long memberId, Long categoryId){
+        int deletedCount = memberCategoryRepository.deletebyMemberIdAndCategoryId(memberId, categoryId);
+        if(deletedCount == 0){
+            throw new BusinessException(ErrorCode.SUBSCRIPTION_NOT_FOUND);
+        }
+        log.info("카테고리 구독 해제 memberId : {}, categoryId : {}", memberId, categoryId);
+    }
+
+
 
     private boolean isDuplicateSubscription(DataIntegrityViolationException e) {
         String message = e.getMostSpecificCause().getMessage();
         return message != null && message.contains("uk_member_category");
     }
-
-
 
 }
