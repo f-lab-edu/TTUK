@@ -3,7 +3,9 @@ package com.ttuk.category;
 import com.ttuk.category.dto.CategoryResponse;
 import com.ttuk.global.auth.Login;
 import com.ttuk.global.auth.LoginMember;
+import com.ttuk.global.auth.RequireRole;
 import com.ttuk.global.response.ApiResponse;
+import com.ttuk.member.MemberRole;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -24,6 +26,7 @@ public class CategoryController {
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
+    @RequireRole(MemberRole.BUYER)
     @PostMapping("/{categoryId}/subscriptions")
     public ResponseEntity<Void> subscribe(@Login LoginMember loginMember,
                                           @PathVariable Long categoryId){
