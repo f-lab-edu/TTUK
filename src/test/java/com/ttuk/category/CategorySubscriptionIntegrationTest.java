@@ -39,6 +39,7 @@ class CategorySubscriptionIntegrationTest {
     private static final String EMAIL = "quill@ttuk.kr";
     private static final String PASSWORD = "a123456789";
     private static final long FRESH_FOOD_ID = 1L;   // data.sql 첫 번째: 신선식품
+    private static final String SELLER_EMAIL = "seller@ttuk.kr";
 
     @Autowired
     MockMvc mockMvc;
@@ -156,7 +157,26 @@ class CategorySubscriptionIntegrationTest {
         assertThat(memberCategoryRepository.count()).isEqualTo(1);
     }
 
+    @Test
+    @DisplayName("판매자가 구독하면 403 FORBIDDEN, 저장되지 않는다")
+    void subscribe_seller_forbidden() throws Exception {
+        memberRepository.save(Member.builder()
+                .email(SELLER_EMAIL)
+                .encodedPassword(passwordEncoder.encode(PASSWORD))
+                .nickname("판매자")
+                .role(MemberRole.SELLER)
+                .phoneNum("01022223333")
+                .zipCode("06236")
+                .address("서울시 강남구 테헤란로 123")
+                .build());
+        Cookie sellerCookie = loginAndGetCookie(SELLER_EMAIL);
 
+        subscribe(sellerCookie, "1")
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.error.code").value("FORBIDDEN"));
+
+        assertThat(memberCategoryRepository.count()).isZero();
+    }
 
     private ResultActions subscribe(Cookie sessionCookie, String categoryId) throws Exception {
         return mockMvc.perform(post("/api/categories/" + categoryId + "/subscriptions")
@@ -164,12 +184,17 @@ class CategorySubscriptionIntegrationTest {
     }
 
     private Cookie loginAndGetCookie() throws Exception {
+        return loginAndGetCookie(EMAIL);
+    }
+
+    private Cookie loginAndGetCookie(String email) throws Exception {
         String json = """
                 { "email": "%s", "password": "%s" }
-                """.formatted(EMAIL, PASSWORD);
+                """.formatted(email, PASSWORD);
         return mockMvc.perform(post("/api/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json))
                 .andReturn().getResponse().getCookie("SESSION");
     }
+
 }

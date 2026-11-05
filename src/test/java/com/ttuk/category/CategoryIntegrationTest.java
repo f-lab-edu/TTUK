@@ -171,6 +171,27 @@ public class CategoryIntegrationTest {
                 .andExpect(jsonPath("$.data[*].subscribed").value(everyItem(is(false))));
     }
 
+    @Test
+    @DisplayName("판매자도 목록을 조회할 수 있고, 구독 개념이 없어 subscribed는 전부 false")
+    void getCategories_seller() throws Exception {
+        memberRepository.save(Member.builder()
+                .email("seller@ttuk.kr")
+                .encodedPassword(passwordEncoder.encode(PASSWORD))
+                .nickname("판매자")
+                .role(MemberRole.SELLER)
+                .phoneNum("01022223333")
+                .zipCode("06236")
+                .address("서울시 강남구 테헤란로 123")
+                .build());
+        Cookie sellerCookie = loginAndGetCookie("seller@ttuk.kr");
+
+        getCategories(sellerCookie)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()").value(8))
+                .andExpect(jsonPath("$.data[*].subscribed").value(everyItem(is(false))));
+    }
+
+
     private ResultActions getCategories(Cookie sessionCookie) throws Exception {
         return mockMvc.perform(get("/api/categories").cookie(sessionCookie));
     }
