@@ -2,9 +2,8 @@ package com.ttuk.member;
 
 import com.ttuk.global.error.BusinessException;
 import com.ttuk.global.error.ErrorCode;
-import com.ttuk.member.dto.PasswordChangeRequest;
-import com.ttuk.member.dto.SignupRequest;
-import com.ttuk.member.dto.SignupResponse;
+import com.ttuk.member.dto.*;
+import com.ttuk.member.dto.MemberUpdateRequest.AddressRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -67,6 +66,34 @@ public class MemberService {
         });
 
         log.info("비밀번호 변경 memberId : {}", memberId);
+    }
+
+    public MyInfoResponse getMyInfo(Long memberId) {
+        Member member = findMember(memberId);
+        return MyInfoResponse.from(member);
+    }
+
+    @Transactional
+    public MyInfoResponse updateMyInfo(Long memberId, MemberUpdateRequest request) {
+
+        Member member = findMember(memberId);
+
+        if(request.nickname() != null){
+            member.changeNickName(request.nickname());
+        }
+
+        if (request.phoneNum() != null) {
+            member.changePhoneNum(request.phoneNum());
+        }
+
+        if (request.address() != null) {
+            AddressRequest address = request.address();
+            member.changeAddress(address.zipCode(), address.address(), address.addressDetail());
+        }
+
+        log.info("내 정보 수정 memberId : {}", memberId);
+        return MyInfoResponse.from(member);
+
     }
 
     private Member findMember(Long memberId){
