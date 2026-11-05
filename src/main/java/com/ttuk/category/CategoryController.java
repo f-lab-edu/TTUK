@@ -35,6 +35,7 @@ public class CategoryController {
         return ResponseEntity.status(HttpStatus.CREATED).build();
     }
 
+    @RequireRole(MemberRole.BUYER)
     @DeleteMapping("/{categoryId}/subscriptions")
     public ResponseEntity<Void> unsubscribe(@Login LoginMember loginMember,
                                             @PathVariable Long categoryId){

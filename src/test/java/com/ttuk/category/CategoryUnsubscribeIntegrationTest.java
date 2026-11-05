@@ -194,6 +194,25 @@ class CategoryUnsubscribeIntegrationTest {
         assertThat(memberCategoryRepository.count()).isZero();
     }
 
+    @Test
+    @DisplayName("판매자가 해제하면 403 FORBIDDEN (서비스까지 가지 않아 404가 아니라 403)")
+    void unsubscribe_seller_forbidden() throws Exception {
+        memberRepository.save(Member.builder()
+                .email("seller@ttuk.kr")
+                .encodedPassword(passwordEncoder.encode(PASSWORD))
+                .nickname("판매자")
+                .role(MemberRole.SELLER)
+                .phoneNum("01022223333")
+                .zipCode("06236")
+                .address("서울시 강남구 테헤란로 123")
+                .build());
+        Cookie sellerCookie = loginAndGetCookie("seller@ttuk.kr");
+
+        unsubscribe(sellerCookie, "1")
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.error.code").value("FORBIDDEN"));
+    }
+
 
 
     private ResultActions unsubscribe(Cookie sessionCookie, String categoryId) throws Exception {
