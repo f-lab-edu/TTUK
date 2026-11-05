@@ -1,0 +1,65 @@
+plugins {
+    id 'java'
+    id 'org.springframework.boot' version '4.1.2'
+    id 'io.spring.dependency-management' version '1.1.7'
+}
+
+group = 'com.ttuk'
+version = '0.0.1-SNAPSHOT'
+description = 'ttuk'
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+    implementation 'org.springframework.boot:spring-boot-starter-data-redis'
+    implementation 'org.springframework.boot:spring-boot-starter-session-data-redis'
+    implementation 'org.springframework.boot:spring-boot-starter-validation'
+    implementation 'org.springframework.boot:spring-boot-starter-webmvc'
+    implementation 'org.springframework.boot:spring-boot-starter-websocket'
+
+    // 비밀번호 BCrypt 해시 (Spring Security 전체 대신 암호화 모듈만)
+    implementation 'org.springframework.security:spring-security-crypto'
+
+    // Querydsl (OpenFeign 관리 버전, Hibernate 7 / Spring Boot 4 대응)
+    implementation 'io.github.openfeign.querydsl:querydsl-jpa:7.5'
+    annotationProcessor 'io.github.openfeign.querydsl:querydsl-apt:7.5:jpa'
+    annotationProcessor 'jakarta.persistence:jakarta.persistence-api'
+
+    // Redisson - 분산락 비교 실험용 (starter가 아닌 core만)
+    implementation 'org.redisson:redisson:4.7.0'
+
+    // AWS S3 - 상품 이미지 업로드
+    implementation platform('software.amazon.awssdk:bom:2.42.28')
+    implementation 'software.amazon.awssdk:s3'
+
+    compileOnly 'org.projectlombok:lombok'
+    developmentOnly 'org.springframework.boot:spring-boot-docker-compose'
+    runtimeOnly 'com.mysql:mysql-connector-j'
+    annotationProcessor 'org.projectlombok:lombok'
+
+    testImplementation 'org.springframework.boot:spring-boot-starter-data-jpa-test'
+    testImplementation 'org.springframework.boot:spring-boot-starter-data-redis-test'
+    testImplementation 'org.springframework.boot:spring-boot-starter-session-data-redis-test'
+    testImplementation 'org.springframework.boot:spring-boot-starter-validation-test'
+    testImplementation 'org.springframework.boot:spring-boot-starter-webmvc-test'
+    testImplementation 'org.springframework.boot:spring-boot-starter-websocket-test'
+    testImplementation 'org.springframework.boot:spring-boot-testcontainers'
+    testImplementation 'org.testcontainers:testcontainers-junit-jupiter'
+    testImplementation 'org.testcontainers:testcontainers-mysql'
+    testCompileOnly 'org.projectlombok:lombok'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+    testAnnotationProcessor 'org.projectlombok:lombok'
+}
+
+tasks.named('test') {
+    useJUnitPlatform()
+}
