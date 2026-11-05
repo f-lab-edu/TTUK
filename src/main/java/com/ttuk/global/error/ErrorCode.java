@@ -26,7 +26,11 @@ public enum ErrorCode {
     // 카테고리
     CATEGORY_NOT_FOUND(HttpStatus.NOT_FOUND, "카테고리를 찾을 수 없습니다."),
     ALREADY_SUBSCRIBED(HttpStatus.CONFLICT, "이미 구독한 카테고리입니다."),
-    SUBSCRIPTION_NOT_FOUND(HttpStatus.NOT_FOUND, "구독하지 않은 카테고리입니다.")
+    SUBSCRIPTION_NOT_FOUND(HttpStatus.NOT_FOUND, "구독하지 않은 카테고리입니다."),
+
+    // 공동구매
+    INVALID_DISCOUNT_RULE(HttpStatus.BAD_REQUEST, "할인 규칙이 올바르지 않습니다."),
+    INVALID_CLOSE_AT(HttpStatus.BAD_REQUEST, "마감 시각은 등록 시점 기준 1시간 뒤부터 7일 뒤까지 설정할 수 있습니다."),
 
     ;
 
