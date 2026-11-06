@@ -6,9 +6,11 @@ import com.ttuk.global.error.BusinessException;
 import com.ttuk.global.error.ErrorCode;
 import com.ttuk.grouppurchase.dto.GroupPurchaseCreateRequest;
 import com.ttuk.grouppurchase.dto.GroupPurchaseCreateResponse;
+import com.ttuk.grouppurchase.event.GroupPurchaseCreatedEvent;
 import com.ttuk.member.Member;
 import com.ttuk.member.MemberRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -25,6 +27,7 @@ public class GroupPurchaseService {
     private final GroupPurchaseRepository groupPurchaseRepository;
     private final CategoryRepository categoryRepository;
     private final MemberRepository memberRepository;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Transactional
     public GroupPurchaseCreateResponse create(Long sellerId, GroupPurchaseCreateRequest request) {
@@ -54,6 +57,7 @@ public class GroupPurchaseService {
                 .build();
 
         GroupPurchase saved = groupPurchaseRepository.save(groupPurchase);
+        eventPublisher.publishEvent(GroupPurchaseCreatedEvent.from(saved));
         return GroupPurchaseCreateResponse.from(saved);
     }
 
