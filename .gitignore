@@ -38,3 +38,6 @@ out/
 
 ### Local config (DB 비밀번호 포함) ###
 src/main/resources/application-local.yml
+
+### Querydsl
+src/main/generated/
