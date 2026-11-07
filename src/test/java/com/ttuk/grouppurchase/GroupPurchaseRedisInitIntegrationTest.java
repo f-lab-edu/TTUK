@@ -122,7 +122,7 @@ public class GroupPurchaseRedisInitIntegrationTest {
     @DisplayName("이미 초기화된 공동구매를 다시 초기화하면 false, 진행 중인 인원을 덮어쓰지 않는다")
     void initialize_twice_doesNotOverwrite() {
         GroupPurchaseCreatedEvent event = new GroupPurchaseCreatedEvent(
-                999L, 3000, 2500, DiscountType.RATE, 5, 10, 50,
+                999L, 1L, "대파 한 단", 3000, 2500, DiscountType.RATE, 5, 10, 50,
                 LocalDateTime.now().plusDays(3).withNano(0));
 
         assertThat(groupPurchaseRedisRepository.initialize(event)).isTrue();
