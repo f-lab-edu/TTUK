@@ -31,6 +31,9 @@ public enum ErrorCode {
     // 공동구매
     INVALID_DISCOUNT_RULE(HttpStatus.BAD_REQUEST, "할인 규칙이 올바르지 않습니다."),
     INVALID_CLOSE_AT(HttpStatus.BAD_REQUEST, "마감 시각은 등록 시점 기준 1시간 뒤부터 7일 뒤까지 설정할 수 있습니다."),
+    INVALID_IMAGE(HttpStatus.BAD_REQUEST, "이미지는 1~5장, 장당 5MB 이하의 jpg·png·webp 파일만 등록할 수 있습니다."),
+
+
 
     ;
 

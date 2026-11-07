@@ -26,3 +26,13 @@ spring:
       encoding: UTF-8
   cache:
     type: redis
+  servlet:
+    multipart:
+      max-file-size: 6MB
+      max-request-size: 31MB
+
+ttuk:
+  s3:
+    bucket: ttuk-images-bucket
+    region: ap-northeast-2
+    public-base-url: https://ttuk-images-bucket.s3.ap-northeast-2.amazonaws.com

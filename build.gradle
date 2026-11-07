@@ -26,6 +26,7 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-webmvc'
     implementation 'org.springframework.boot:spring-boot-starter-websocket'
     implementation 'org.springframework.boot:spring-boot-starter-cache'
+    testImplementation 'org.testcontainers:testcontainers-localstack'
 
     // 비밀번호 BCrypt 해시 (Spring Security 전체 대신 암호화 모듈만)
     implementation 'org.springframework.security:spring-security-crypto'
