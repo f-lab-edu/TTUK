@@ -40,7 +40,6 @@
 8. [성능 · 정합성 비교](#성능--정합성-비교)
 9. [이슈와 해결 과정](#이슈와-해결-과정)
 10. [고민한 부분 / 한계](#고민한-부분--한계)
-11. [실행 방법](#실행-방법)
 
 ---
 
@@ -398,37 +397,3 @@ _결과 그래프 첨부 예정_
 - **악성 파일 완전 차단** — 첫 바이트 검사만으로는 한계 → 이미지 디코딩 · 백신 검사 연동 검토
 
 ---
-
-## 실행 방법
-
-### 요구 사항
-
-- Java 21, Docker
-- AWS CLI (S3 업로드를 로컬에서 실행할 경우)
-- LocalStack 무료 토큰 (테스트 실행 시)
-
-### 환경 변수
-
-| 이름 | 용도 |
-|---|---|
-| `AWS_PROFILE` | 로컬 실행 시 사용할 AWS CLI 프로필 (`~/.aws/credentials`). 운영 EC2는 IAM Role 사용 |
-| `LOCALSTACK_AUTH_TOKEN` | 테스트용 가짜 S3(LocalStack) 실행 토큰 |
-
-> 액세스 키 · 토큰은 코드와 `application.yml`에 넣지 않습니다.
-
-### 로컬 실행
-
-```bash
-aws configure --profile ttuk          # 최초 1회
-export AWS_PROFILE=ttuk               # Windows PowerShell: $env:AWS_PROFILE="ttuk"
-./gradlew bootRun
-```
-
-### 테스트
-
-```bash
-export LOCALSTACK_AUTH_TOKEN=발급받은토큰   # Windows: setx LOCALSTACK_AUTH_TOKEN "토큰" 후 터미널 재시작
-./gradlew test
-```
-
-Testcontainers가 MySQL · Redis · LocalStack 컨테이너를 자동으로 띄웁니다.
