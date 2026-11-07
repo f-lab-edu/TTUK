@@ -25,6 +25,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import com.ttuk.support.TestMultipartFiles;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -42,6 +44,8 @@ public class GroupPurchaseCreateIntegrationTest {
     MemberRepository memberRepository;
     @Autowired
     GroupPurchaseRepository groupPurchaseRepository;
+    @Autowired
+    GroupPurchaseImageRepository groupPurchaseImageRepository;
     @Autowired
     PasswordEncoder passwordEncoder;
 
@@ -62,6 +66,7 @@ public class GroupPurchaseCreateIntegrationTest {
 
     @AfterEach
     void cleanUp() {
+        groupPurchaseImageRepository.deleteAll();
         groupPurchaseRepository.deleteAll();
         memberRepository.deleteAll();
     }
@@ -75,7 +80,8 @@ public class GroupPurchaseCreateIntegrationTest {
         create(sellerCookie, json(FRESH_FOOD_ID, 2500, LocalDateTime.now().plusDays(3)))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.data.groupPurchaseId").isNumber())
-                .andExpect(jsonPath("$.data.status").value("OPEN"));
+                .andExpect(jsonPath("$.data.status").value("OPEN"))
+                .andExpect(jsonPath("$.data.thumbnailUrl").isString());;
 
         List<GroupPurchase> saved = groupPurchaseRepository.findAll();
         assertThat(saved).hasSize(1);
@@ -171,12 +177,11 @@ public class GroupPurchaseCreateIntegrationTest {
         assertThat(groupPurchaseRepository.count()).isZero();
     }
 
-
     private ResultActions create(Cookie sessionCookie, String json) throws Exception {
-        return mockMvc.perform(post("/api/group-purchases")
-                .cookie(sessionCookie)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(json));
+        return mockMvc.perform(multipart("/api/group-purchases")
+                .file(TestMultipartFiles.requestPart(json))
+                .file(TestMultipartFiles.pngImage("daepa.png"))
+                .cookie(sessionCookie));
     }
 
     private String json(long categoryId, int floorPrice, LocalDateTime closeAt) {
