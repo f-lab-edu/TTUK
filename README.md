@@ -73,8 +73,6 @@
 
 ## 기술 선택 이유
 
-> 각 기술을 대안과 같은 기준으로 비교하고, 이 프로젝트에 맞는 쪽을 골랐습니다.
-
 ### JPA + Querydsl (vs MyBatis, JPQL 문자열)
 
 | 기준 | MyBatis | JPQL 문자열 (`@Query`) | **JPA + Querydsl** |
