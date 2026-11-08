@@ -77,11 +77,6 @@
 - 엔티티 필드명을 바꾸면 Q클래스가 다시 생성되면서 **틀린 쿼리가 컴파일 에러**로 드러남
 - 회사에서는 MyBatis를 쓰고 있어, 개인 프로젝트는 일부러 JPA로 해서 **두 방식을 실제로 비교**
 
-**감수한 것과 대응**
-- 실행되는 SQL이 코드에 안 보임 → SQL 로그로 확인, 목록 쿼리는 `EXPLAIN`으로 인덱스 확인 후 추가
-- N+1 위험 → `default_batch_fetch_size: 100`, 연관관계는 전부 `LAZY`, 양방향은 꼭 필요할 때만
-- 업데이트 시 모든 컬럼을 쓰는 기본 동작 → 동시 수정 손실을 막으려 `@DynamicUpdate`
-
 ### MySQL (vs PostgreSQL)
 
 | 기준 | PostgreSQL | **MySQL 8 (InnoDB)** |
@@ -98,10 +93,6 @@
 - 자주 바뀌는 인원·단가는 Redis가 맡고 MySQL은 **기록과 조회**만 담당 → PostgreSQL의 고급 기능을 쓸 일이 없음
 - 국내에서 가장 많이 쓰는 DB라 실무 감각과 연결되고, InnoDB 구조(버퍼 풀, 리두 로그, 인덱스)를 직접 적용·검증
 
-**감수한 것**
-- 회사 스택(PostgreSQL)과 다르지만, JPA를 써서 SQL 방언 차이는 대부분 Hibernate가 흡수
-- 복잡한 통계·분석 쿼리가 필요해지면 PostgreSQL이 유리 → 현재 범위엔 없음
-
 ### Gradle (vs Maven)
 
 | 기준 | Maven | **Gradle (Groovy DSL)** |
@@ -116,9 +107,6 @@
 - Testcontainers 통합 테스트를 자주 돌리는 프로젝트라 **증분 빌드·캐시로 반복 빌드가 빠른** 게 중요
 - 의존성 추가가 한 줄이라 Querydsl·AWS SDK BOM·Testcontainers 설정이 짧고 한눈에 보임
 - 회사는 Maven이라, 개인 프로젝트는 Gradle로 **두 빌드 도구를 모두 다뤄 보기** 위함
-
-**감수한 것**
-- 자유도가 높아 설정이 복잡해지기 쉬움 → 스프링 부트 플러그인·BOM으로 버전 관리를 맡기고, 커스텀 설정은 최소로
 
 ### GitHub Actions (vs Jenkins)
 
@@ -136,9 +124,6 @@
 - 코드가 GitHub에 있고 **PR 단위로 멘토 리뷰**를 받는 흐름이라, PR마다 테스트·정적 분석 결과가 바로 붙는 게 리뷰에 유리
 - 워크플로가 레포 안 파일이라 **배포 방식 변경도 PR로 리뷰** 가능
 
-**감수한 것**
-- GitHub에 종속 → 워크플로를 "빌드 → 이미지 → EC2 배포" 단계로 단순하게 유지해 다른 도구로 옮기기 쉽게
-
 ### S3 (vs 로컬 디스크 · DB BLOB · Cloudflare R2)
 
 | 기준 | 로컬 디스크 / Docker 볼륨 | DB BLOB | Cloudflare R2 | **S3** |
@@ -155,10 +140,6 @@
 - 같은 AWS라 EC2에 **IAM Role**만 붙이면 코드·설정에 액세스 키를 둘 필요가 없음 (로컬은 AWS CLI 프로필, 권한은 `images/*` 업로드·삭제만)
 - S3 API가 사실상 표준이라 LocalStack으로 진짜와 같은 코드로 테스트하고, 필요하면 R2·MinIO로 옮기기도 쉬움
 - DB엔 **S3 키만** 저장 → CloudFront 도입 등 주소가 바뀌어도 설정 한 줄만 변경
-
-**감수한 것**
-- 외부 전송 요금 → 이미지에 `Cache-Control: immutable`로 재요청을 줄이고, 트래픽이 커지면 CloudFront나 R2 검토
-- 버킷 정책으로 `images/*` 읽기 공개 → 상품 이미지만 두고 목록 조회는 막음. 실무 표준인 비공개 버킷 + CloudFront OAC는 [고민한 부분](#고민한-부분--한계)에 기록
 
 ---
 
