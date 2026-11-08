@@ -264,9 +264,7 @@ flowchart LR
 
 ## ERD
 
-![ERD](docs/images/erd.png)
-
-[dbdiagram에서 크게 보기 →](https://dbdiagram.io/d/ttuk-6add7c04aac3301410110c0a)
+[dbdiagram →](https://dbdiagram.io/d/ttuk-6add7c04aac3301410110c0a)
 
 | 테이블 | 역할 |
 |---|---|
