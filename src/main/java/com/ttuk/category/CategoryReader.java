@@ -19,7 +19,7 @@ public class CategoryReader {
 
     private final CategoryRepository categoryRepository;
 
-    @Cacheable(cacheNames = CacheConfig.CATEGORIES, key = "'all'")
+    @Cacheable(cacheNames = CacheConfig.CATEGORIES, key = "'all'", sync = true)
     public CategorySummaries findAll(){
         log.info("카테고리 목록 DB 조회 (캐시 없음)");
         List<Category> categories = categoryRepository.findAll(Sort.by("id"));
