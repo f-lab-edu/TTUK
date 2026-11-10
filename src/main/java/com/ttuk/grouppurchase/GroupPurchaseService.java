@@ -19,6 +19,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.time.Clock;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -37,6 +38,7 @@ public class GroupPurchaseService {
     private final S3ImageStorage imageStorage;
     private final TransactionTemplate transactionTemplate;
     private final ApplicationEventPublisher eventPublisher;
+    private final Clock clock;
 
     public GroupPurchaseCreateResponse create(Long sellerId, GroupPurchaseCreateRequest request,
                                               List<MultipartFile> images) {
@@ -116,7 +118,7 @@ public class GroupPurchaseService {
     }
 
     private void validateCloseAt(LocalDateTime closeAt) {
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = LocalDateTime.now(clock);
         if (closeAt.isBefore(now.plus(MIN_OPEN_DURATION)) || closeAt.isAfter(now.plus(MAX_OPEN_DURATION))) {
             throw new BusinessException(ErrorCode.INVALID_CLOSE_AT);
         }
