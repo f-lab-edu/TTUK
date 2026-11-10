@@ -21,10 +21,7 @@ import org.springframework.test.web.servlet.ResultActions;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
+import java.util.concurrent.*;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -40,6 +37,7 @@ class CategorySubscriptionIntegrationTest {
     private static final String PASSWORD = "a123456789";
     private static final long FRESH_FOOD_ID = 1L;   // data.sql 첫 번째: 신선식품
     private static final String SELLER_EMAIL = "seller@ttuk.kr";
+    private static final long TIMEOUT_SECONDS = 10;
 
     @Autowired
     MockMvc mockMvc;
@@ -134,23 +132,27 @@ class CategorySubscriptionIntegrationTest {
         CountDownLatch ready = new CountDownLatch(requestCount);
         CountDownLatch start = new CountDownLatch(1);
         List<Future<Integer>> futures = new ArrayList<>();
-
-        for (int i = 0; i < requestCount; i++) {
-            futures.add(executor.submit(() -> {
-                ready.countDown();
-                start.await();
-                return subscribe(sessionCookie, "1").andReturn().getResponse().getStatus();
-            }));
-        }
-
-        ready.await();
-        start.countDown();
-
         List<Integer> statuses = new ArrayList<>();
-        for (Future<Integer> future : futures) {
-            statuses.add(future.get());
+
+        try {
+            for (int i = 0; i < requestCount; i++) {
+                futures.add(executor.submit(() -> {
+                    ready.countDown();
+                    start.await();
+                    return subscribe(sessionCookie, "1").andReturn().getResponse().getStatus();
+                }));
+            }
+
+            boolean allReady = ready.await(TIMEOUT_SECONDS, TimeUnit.SECONDS);
+            assertThat(allReady).as("제한 시간 안에 모든 요청 스레드가 준비되지 않음").isTrue();
+            start.countDown();
+
+            for (Future<Integer> future : futures) {
+                statuses.add(future.get(TIMEOUT_SECONDS, TimeUnit.SECONDS));
+            }
+        } finally {
+            executor.shutdownNow();
         }
-        executor.shutdown();
 
         assertThat(statuses).containsOnly(201, 409);
         assertThat(Collections.frequency(statuses, 201)).isEqualTo(1);
