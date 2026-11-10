@@ -14,6 +14,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.time.Clock;
 
 @Service
 @RequiredArgsConstructor
@@ -25,6 +26,7 @@ public class GroupPurchaseService {
     private final GroupPurchaseRepository groupPurchaseRepository;
     private final CategoryRepository categoryRepository;
     private final MemberRepository memberRepository;
+    private final Clock clock;
 
     @Transactional
     public GroupPurchaseCreateResponse create(Long sellerId, GroupPurchaseCreateRequest request) {
@@ -70,7 +72,7 @@ public class GroupPurchaseService {
     }
 
     private void validateCloseAt(LocalDateTime closeAt) {
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = LocalDateTime.now(clock);
         if (closeAt.isBefore(now.plus(MIN_OPEN_DURATION)) || closeAt.isAfter(now.plus(MAX_OPEN_DURATION))) {
             throw new BusinessException(ErrorCode.INVALID_CLOSE_AT);
         }

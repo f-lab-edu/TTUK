@@ -20,6 +20,7 @@ import org.springframework.test.web.servlet.ResultActions;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.time.Clock;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -44,6 +45,8 @@ public class GroupPurchaseCreateIntegrationTest {
     GroupPurchaseRepository groupPurchaseRepository;
     @Autowired
     PasswordEncoder passwordEncoder;
+    @Autowired
+    Clock clock;
 
     private Member seller;
 
@@ -72,7 +75,7 @@ public class GroupPurchaseCreateIntegrationTest {
 
         Cookie sellerCookie = loginAndGetCookie(SELLER_EMAIL);
 
-        create(sellerCookie, json(FRESH_FOOD_ID, 2500, LocalDateTime.now().plusDays(3)))
+        create(sellerCookie, json(FRESH_FOOD_ID, 2500, LocalDateTime.now(clock).plusDays(3)))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.data.groupPurchaseId").isNumber())
                 .andExpect(jsonPath("$.data.status").value("OPEN"));
@@ -102,7 +105,7 @@ public class GroupPurchaseCreateIntegrationTest {
                 .build());
 
         Cookie buyerCookie = loginAndGetCookie(BUYER_EMAIL);
-        create(buyerCookie, json(FRESH_FOOD_ID, 2500, LocalDateTime.now().plusDays(3)))
+        create(buyerCookie, json(FRESH_FOOD_ID, 2500, LocalDateTime.now(clock).plusDays(3)))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.error.code").value("FORBIDDEN"));
         assertThat(groupPurchaseRepository.count()).isZero();
@@ -125,7 +128,7 @@ public class GroupPurchaseCreateIntegrationTest {
                   "discountStepSize": 10,
                   "closeAt": "%s"
                 }
-                """.formatted(LocalDateTime.now().plusDays(3).withNano(0));
+                """.formatted(LocalDateTime.now(clock).plusDays(3).withNano(0));
 
         create(sellerCookie, json)
                 .andExpect(status().isBadRequest())
@@ -140,7 +143,7 @@ public class GroupPurchaseCreateIntegrationTest {
     void create_invalidDiscountRule() throws Exception {
         Cookie sellerCookie = loginAndGetCookie(SELLER_EMAIL);
 
-        create(sellerCookie, json(FRESH_FOOD_ID, 3500, LocalDateTime.now().plusDays(3)))
+        create(sellerCookie, json(FRESH_FOOD_ID, 3500, LocalDateTime.now(clock).plusDays(3)))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.error.code").value("INVALID_DISCOUNT_RULE"));
 
@@ -152,7 +155,7 @@ public class GroupPurchaseCreateIntegrationTest {
     void create_invalidCloseAt() throws Exception {
         Cookie sellerCookie = loginAndGetCookie(SELLER_EMAIL);
 
-        create(sellerCookie, json(FRESH_FOOD_ID, 2500, LocalDateTime.now().plusMinutes(30)))
+        create(sellerCookie, json(FRESH_FOOD_ID, 2500, LocalDateTime.now(clock).plusMinutes(30)))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.error.code").value("INVALID_CLOSE_AT"));
 
@@ -164,7 +167,7 @@ public class GroupPurchaseCreateIntegrationTest {
     void create_categoryNotFound() throws Exception {
         Cookie sellerCookie = loginAndGetCookie(SELLER_EMAIL);
 
-        create(sellerCookie, json(999L, 2500, LocalDateTime.now().plusDays(3)))
+        create(sellerCookie, json(999L, 2500, LocalDateTime.now(clock).plusDays(3)))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.error.code").value("CATEGORY_NOT_FOUND"));
 
