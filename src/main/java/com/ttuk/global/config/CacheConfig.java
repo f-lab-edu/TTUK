@@ -17,15 +17,18 @@ public class CacheConfig {
 
     public static final String CATEGORIES = "categories";
 
+
     @Bean
-    public RedisCacheManagerBuilderCustomizer categoryCacheCustomizer(){
+    public RedisCacheManagerBuilderCustomizer cacheCustomizer(CacheVersion cacheVersion) {
 
-        RedisCacheConfiguration categoryConfig = RedisCacheConfiguration.defaultCacheConfig()
-                .entryTtl(Duration.ofHours(1))
-                .serializeValuesWith(SerializationPair.fromSerializer(
-                        new JacksonJsonRedisSerializer<>(CategorySummaries.class)));
+        RedisCacheConfiguration defaults = RedisCacheConfiguration.defaultCacheConfig().prefixCacheNameWith(cacheVersion.prefix());
 
-        return builder -> builder.withCacheConfiguration(CATEGORIES, categoryConfig);
+        RedisCacheConfiguration categoryConfig =
+                defaults.entryTtl(Duration.ofHours(1)).
+                        serializeValuesWith(SerializationPair.fromSerializer(
+                new JacksonJsonRedisSerializer<>(CategorySummaries.class)));
+
+        return builder -> builder.cacheDefaults(defaults).withCacheConfiguration(CATEGORIES, categoryConfig);
 
     }
 
