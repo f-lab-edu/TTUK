@@ -1,5 +1,7 @@
 package com.ttuk.category;
 
+import com.ttuk.global.config.CacheConfig;
+import com.ttuk.global.config.CacheVersion;
 import com.ttuk.member.Member;
 import com.ttuk.member.MemberRepository;
 import com.ttuk.member.MemberRole;
@@ -19,9 +21,6 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
-import org.testcontainers.shaded.org.checkerframework.checker.units.qual.C;
-
-import java.time.Duration;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.contains;
@@ -30,7 +29,6 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-
 @SpringBootTest
 @AutoConfigureMockMvc
 @Import(TestcontainersConfig.class)
@@ -38,7 +36,6 @@ public class CategoryIntegrationTest {
 
     private static final String EMAIL = "quill@ttuk.kr";
     private static final String PASSWORD = "a123456789";
-    private static final String CACHE_KEY = "categories::all";
     private static final String TEMP_NAME = "임시이름";
 
     @Autowired
@@ -51,10 +48,12 @@ public class CategoryIntegrationTest {
     StringRedisTemplate redisTemplate;
     @Autowired
     JdbcTemplate jdbcTemplate;
+    @Autowired
+    CacheVersion cacheVersion;
 
     @BeforeEach
     void setUp() {
-        redisTemplate.delete(CACHE_KEY);
+        redisTemplate.delete(cacheKey());
 
         memberRepository.save(Member.builder()
                 .email(EMAIL)
@@ -70,22 +69,21 @@ public class CategoryIntegrationTest {
     @AfterEach
     void cleanUp() {
         memberRepository.deleteAll();
-        redisTemplate.delete(CACHE_KEY);
+        redisTemplate.delete(cacheKey());
         jdbcTemplate.update("UPDATE category SET name = ? WHERE name = ?", "신선식품", TEMP_NAME);
     }
 
     @Test
     @DisplayName("목록 조회 성공: 200, 초기 데이터 8개가 id 순서로 나온다")
     void getCategories_success() throws Exception {
-
         Cookie sessionCookie = loginAndGetCookie();
+
         getCategories(sessionCookie)
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.length()").value(8))
                 .andExpect(jsonPath("$.data[*].name").value(contains(
                         "신선식품", "가공식품", "생활용품", "전자제품",
                         "도서·문구", "뷰티", "유아동", "반려동물")));
-
     }
 
     @Test
@@ -97,15 +95,16 @@ public class CategoryIntegrationTest {
     }
 
     @Test
-    @DisplayName("첫 조회 후 Redis에 목록이 1시간 이내 TTL로 저장된다")
+    @DisplayName("첫 조회 후 Redis에 빌드 시각이 붙은 키로 1시간 이내 TTL과 함께 저장된다")
     void getCategories_storesCache() throws Exception {
         Cookie sessionCookie = loginAndGetCookie();
-        assertThat(redisTemplate.hasKey(CACHE_KEY)).isFalse();
+        assertThat(redisTemplate.hasKey(cacheKey())).isFalse();
 
         getCategories(sessionCookie).andExpect(status().isOk());
 
-        assertThat(redisTemplate.hasKey(CACHE_KEY)).isTrue();
-        assertThat(redisTemplate.getExpire(CACHE_KEY)).isPositive().isLessThanOrEqualTo(3600L);
+        assertThat(redisTemplate.hasKey(cacheKey())).isTrue();
+        assertThat(redisTemplate.hasKey(CacheConfig.CATEGORIES + "::all")).isFalse();
+        assertThat(redisTemplate.getExpire(cacheKey())).isPositive().isLessThanOrEqualTo(3600L);
     }
 
     @Test
@@ -121,10 +120,14 @@ public class CategoryIntegrationTest {
         getCategories(sessionCookie)
                 .andExpect(jsonPath("$.data[0].name").value("신선식품"));
 
-        redisTemplate.delete(CACHE_KEY);
+        redisTemplate.delete(cacheKey());
 
         getCategories(sessionCookie)
                 .andExpect(jsonPath("$.data[0].name").value(TEMP_NAME));
+    }
+
+    private String cacheKey() {
+        return cacheVersion.prefix() + CacheConfig.CATEGORIES + "::all";
     }
 
     private ResultActions getCategories(Cookie sessionCookie) throws Exception {
@@ -140,6 +143,4 @@ public class CategoryIntegrationTest {
                         .content(json))
                 .andReturn().getResponse().getCookie("SESSION");
     }
-
-
 }
