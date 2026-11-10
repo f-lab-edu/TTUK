@@ -3,7 +3,7 @@
 -- ARGV[5] discountStepSize, ARGV[6] maxHeadcount('' = 무제한),
 -- ARGV[7] closeAt(epoch 초), ARGV[8] keepUntil(closeAt + 1일, epoch 초)
 
-if redis.call('EXISTS', KEYS[4]) == 1 then
+if redis.call('EXISTS', KEYS[1]) == 1 then
 	return 0
 end
 

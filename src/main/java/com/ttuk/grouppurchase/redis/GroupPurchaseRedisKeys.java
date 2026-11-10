@@ -2,28 +2,30 @@ package com.ttuk.grouppurchase.redis;
 
 public final class GroupPurchaseRedisKeys {
 
-    private static final String PREFIX = "group_purchase:";
-
-    public GroupPurchaseRedisKeys() {
+    private GroupPurchaseRedisKeys() {
     }
 
-    public static String meta(Long groupPurchaseId){
-        return PREFIX + groupPurchaseId + ":meta";
+    public static String meta(Long groupPurchaseId) {
+        return key(groupPurchaseId, "meta");
     }
 
-    public static String headcount(Long groupPurchaseId){
-        return PREFIX + groupPurchaseId + ":headcount";
+    public static String headcount(Long groupPurchaseId) {
+        return key(groupPurchaseId, "headcount");
     }
 
     public static String price(Long groupPurchaseId) {
-        return PREFIX + groupPurchaseId + ":price";
+        return key(groupPurchaseId, "price");
     }
 
     public static String participants(Long groupPurchaseId) {
-        return PREFIX + groupPurchaseId + ":participants";
+        return key(groupPurchaseId, "participants");
     }
 
     public static String status(Long groupPurchaseId) {
-        return PREFIX + groupPurchaseId + ":status";
+        return key(groupPurchaseId, "status");
+    }
+
+    private static String key(Long groupPurchaseId, String field) {
+        return "group_purchase:{" + groupPurchaseId + "}:" + field;
     }
 }
