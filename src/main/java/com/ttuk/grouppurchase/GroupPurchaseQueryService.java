@@ -1,10 +1,10 @@
 package com.ttuk.grouppurchase;
 
+import com.ttuk.global.error.BusinessException;
+import com.ttuk.global.error.ErrorCode;
 import com.ttuk.global.response.PageResponse;
 import com.ttuk.global.storage.S3ImageStorage;
-import com.ttuk.grouppurchase.dto.GroupPurchaseListRequest;
-import com.ttuk.grouppurchase.dto.GroupPurchaseListRow;
-import com.ttuk.grouppurchase.dto.GroupPurchaseSummaryResponse;
+import com.ttuk.grouppurchase.dto.*;
 import com.ttuk.grouppurchase.redis.GroupPurchaseLiveValue;
 import com.ttuk.grouppurchase.redis.GroupPurchaseRedisRepository;
 import lombok.RequiredArgsConstructor;
@@ -13,6 +13,7 @@ import org.springframework.stereotype.Service;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
@@ -47,6 +48,21 @@ public class GroupPurchaseQueryService {
         }
         return PageResponse.of(content, request.page(), request.size(), totalElement);
 
+    }
+
+    public GroupPurchaseDetailResponse findDetail(Long groupPurchaseId){
+
+        Optional<GroupPurchaseDetailRow> found = queryRepository.findDetail(groupPurchaseId);
+        if(found.isEmpty()){
+            throw new BusinessException(ErrorCode.GROUP_PURCHASE_NOT_FOUND);
+        }
+        GroupPurchaseDetailRow row = found.get();
+        List<String> imageUrls = new ArrayList<>();
+        for(String imageKey : queryRepository.findImageKeys(groupPurchaseId)){
+            imageUrls.add(imageStorage.toUrl(imageKey));
+        }
+
+        return GroupPurchaseDetailResponse.of(row, imageUrls);
 
     }
 
