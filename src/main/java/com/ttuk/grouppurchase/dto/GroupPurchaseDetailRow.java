@@ -1,5 +1,6 @@
 package com.ttuk.grouppurchase.dto;
 
+import com.ttuk.grouppurchase.DiscountPolicy;
 import com.ttuk.grouppurchase.DiscountType;
 import com.ttuk.grouppurchase.GroupPurchaseStatus;
 
@@ -21,4 +22,9 @@ public record GroupPurchaseDetailRow(
         LocalDateTime closeAt,
         GroupPurchaseStatus status
 ) {
+
+    public DiscountPolicy discountPolicy() {
+        return new DiscountPolicy(basePrice, floorPrice, discountType, discountValue, discountStepSize);
+    }
+
 }

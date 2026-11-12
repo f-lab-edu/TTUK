@@ -68,8 +68,23 @@ public class GroupPurchaseQueryService {
         int currentPrice = live.price() == null ? row.basePrice() : live.price();
         GroupPurchaseStatus status = live.status() == null ? row.status() : live.status();
 
+        Optional<NextDiscount> next = findNextDiscount(row, currentHeadcount, status);
+        Integer nextDiscountIn = next.isPresent() ? next.get().remainingHeadcount() : null;
+        Integer nextPrice = next.isPresent() ? next.get().price() : null;
+
         return GroupPurchaseDetailResponse.of(
-                row, imageUrls, currentHeadcount, currentPrice, status, live.joined());
+                row, imageUrls, currentHeadcount, currentPrice,
+                nextDiscountIn, nextPrice, status, live.joined());
+
+    }
+
+    private Optional<NextDiscount> findNextDiscount(GroupPurchaseDetailRow  row,
+                                                    int currentHeadCount,
+                                                    GroupPurchaseStatus status){
+        if(status != GroupPurchaseStatus.OPEN){
+            return Optional.empty();
+        }
+        return row.discountPolicy().nextDiscount(currentHeadCount, row.maxHeadcount());
 
     }
 
