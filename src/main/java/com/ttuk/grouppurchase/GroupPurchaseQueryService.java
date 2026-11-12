@@ -5,6 +5,7 @@ import com.ttuk.global.error.ErrorCode;
 import com.ttuk.global.response.PageResponse;
 import com.ttuk.global.storage.S3ImageStorage;
 import com.ttuk.grouppurchase.dto.*;
+import com.ttuk.grouppurchase.redis.GroupPurchaseLiveDetail;
 import com.ttuk.grouppurchase.redis.GroupPurchaseLiveValue;
 import com.ttuk.grouppurchase.redis.GroupPurchaseRedisRepository;
 import lombok.RequiredArgsConstructor;
@@ -50,7 +51,7 @@ public class GroupPurchaseQueryService {
 
     }
 
-    public GroupPurchaseDetailResponse findDetail(Long groupPurchaseId){
+    public GroupPurchaseDetailResponse findDetail(Long groupPurchaseId, Long memberId){
 
         Optional<GroupPurchaseDetailRow> found = queryRepository.findDetail(groupPurchaseId);
         if(found.isEmpty()){
@@ -62,7 +63,13 @@ public class GroupPurchaseQueryService {
             imageUrls.add(imageStorage.toUrl(imageKey));
         }
 
-        return GroupPurchaseDetailResponse.of(row, imageUrls);
+        GroupPurchaseLiveDetail live = redisRepository.findLiveDetail(groupPurchaseId, memberId);
+        int currentHeadcount = live.headcount() == null ? 0 : live.headcount();
+        int currentPrice = live.price() == null ? row.basePrice() : live.price();
+        GroupPurchaseStatus status = live.status() == null ? row.status() : live.status();
+
+        return GroupPurchaseDetailResponse.of(
+                row, imageUrls, currentHeadcount, currentPrice, status, live.joined());
 
     }
 
