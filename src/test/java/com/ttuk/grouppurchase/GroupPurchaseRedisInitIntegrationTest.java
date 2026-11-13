@@ -1,11 +1,13 @@
 package com.ttuk.grouppurchase;
 
+import com.ttuk.global.config.ClockConfig;
 import com.ttuk.grouppurchase.event.GroupPurchaseCreatedEvent;
 import com.ttuk.grouppurchase.redis.GroupPurchaseRedisKeys;
 import com.ttuk.grouppurchase.redis.GroupPurchaseRedisRepository;
 import com.ttuk.member.Member;
 import com.ttuk.member.MemberRepository;
 import com.ttuk.member.MemberRole;
+import com.ttuk.support.TestMultipartFiles;
 import com.ttuk.support.TestcontainersConfig;
 import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.AfterEach;
@@ -21,18 +23,17 @@ import org.springframework.http.MediaType;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.web.servlet.MockMvc;
 
+import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDateTime;
-import java.time.ZoneId;
 import java.util.Map;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.within;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
-import com.ttuk.support.TestMultipartFiles;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 
 
 @SpringBootTest
@@ -43,7 +44,6 @@ public class GroupPurchaseRedisInitIntegrationTest {
     private static final String SELLER_EMAIL = "seller@ttuk.kr";
     private static final String PASSWORD = "a123456789";
     private static final long FRESH_FOOD_ID = 1L;
-    private static final ZoneId ZONE = ZoneId.of("Asia/Seoul");
 
 
     @Autowired
@@ -58,6 +58,8 @@ public class GroupPurchaseRedisInitIntegrationTest {
     StringRedisTemplate redisTemplate;
     @Autowired
     PasswordEncoder passwordEncoder;
+    @Autowired
+    private Clock clock;
 
     @Autowired
     GroupPurchaseImageRepository groupPurchaseImageRepository;
@@ -129,7 +131,7 @@ public class GroupPurchaseRedisInitIntegrationTest {
     void initialize_twice_doesNotOverwrite() {
         GroupPurchaseCreatedEvent event = new GroupPurchaseCreatedEvent(
                 999L, 1L, "대파 한 단", 3000, 2500, DiscountType.RATE, 5, 10, 50,
-                LocalDateTime.now().plusDays(3).withNano(0));
+                LocalDateTime.now(clock).plusDays(3).withNano(0));
 
         assertThat(groupPurchaseRedisRepository.initialize(event)).isTrue();
         redisTemplate.opsForValue().increment(GroupPurchaseRedisKeys.headcount(999L), 3);
@@ -142,12 +144,12 @@ public class GroupPurchaseRedisInitIntegrationTest {
 
 
     private void assertExpiresAt(String key, long expectedEpochSecond){
-        long expectedTtl = expectedEpochSecond - Instant.now().getEpochSecond();
+        long expectedTtl = expectedEpochSecond - Instant.now(clock).getEpochSecond();
         assertThat(redisTemplate.getExpire(key)).isCloseTo(expectedTtl, within(5L));
     }
 
     private long toEpochSecond(LocalDateTime dateTime) {
-        return dateTime.atZone(ZONE).toEpochSecond();
+        return dateTime.atZone(ClockConfig.SERVICE_ZONE).toEpochSecond();
     }
 
     private String json(LocalDateTime closeAt) {

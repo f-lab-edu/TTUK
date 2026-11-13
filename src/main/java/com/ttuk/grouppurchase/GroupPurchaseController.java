@@ -4,18 +4,18 @@ import com.ttuk.global.auth.Login;
 import com.ttuk.global.auth.LoginMember;
 import com.ttuk.global.auth.RequireRole;
 import com.ttuk.global.response.ApiResponse;
+import com.ttuk.global.response.PageResponse;
 import com.ttuk.grouppurchase.dto.GroupPurchaseCreateRequest;
 import com.ttuk.grouppurchase.dto.GroupPurchaseCreateResponse;
+import com.ttuk.grouppurchase.dto.GroupPurchaseListRequest;
+import com.ttuk.grouppurchase.dto.GroupPurchaseSummaryResponse;
 import com.ttuk.member.MemberRole;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestPart;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
@@ -26,6 +26,7 @@ import java.util.List;
 public class GroupPurchaseController {
 
     private final GroupPurchaseService groupPurchaseService;
+    private final GroupPurchaseQueryService groupPurchaseQueryService;
 
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @RequireRole(MemberRole.SELLER)
@@ -37,4 +38,13 @@ public class GroupPurchaseController {
         GroupPurchaseCreateResponse response = groupPurchaseService.create(loginMember.memberId(), request, images);
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(response));
     }
+
+    @GetMapping
+    public ResponseEntity<ApiResponse<PageResponse<GroupPurchaseSummaryResponse>>> list(
+            @Valid GroupPurchaseListRequest request ){
+
+        PageResponse<GroupPurchaseSummaryResponse> response = groupPurchaseQueryService.findOpenList(request);
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
 }
