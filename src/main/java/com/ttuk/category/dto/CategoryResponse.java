@@ -2,11 +2,12 @@ package com.ttuk.category.dto;
 
 public record CategoryResponse(
         Long categoryId,
-        String name
+        String name,
+        boolean subscribed
 ) {
 
-    public static CategoryResponse from(CategorySummary summary) {
-        return new CategoryResponse(summary.categoryId(), summary.name());
+    public static CategoryResponse of(CategorySummary summary, boolean subscribed) {
+        return new CategoryResponse(summary.categoryId(), summary.name(), subscribed);
     }
 
 }
