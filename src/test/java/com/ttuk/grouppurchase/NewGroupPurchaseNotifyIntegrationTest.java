@@ -28,6 +28,8 @@ import java.util.Set;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import com.ttuk.support.TestMultipartFiles;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 
 
 @SpringBootTest
@@ -50,6 +52,9 @@ public class NewGroupPurchaseNotifyIntegrationTest {
     @Autowired
     PasswordEncoder passwordEncoder;
 
+    @Autowired
+    GroupPurchaseImageRepository groupPurchaseImageRepository;
+
     @BeforeEach
     void setUp() {
         redisTemplate.delete(NotificationStreamRepository.STREAM_KEY);
@@ -69,6 +74,7 @@ public class NewGroupPurchaseNotifyIntegrationTest {
         redisTemplate.delete(NotificationStreamRepository.STREAM_KEY);
         Set<String> keys = redisTemplate.keys("group_purchase:*");
         redisTemplate.delete(keys);
+        groupPurchaseImageRepository.deleteAll();
         groupPurchaseRepository.deleteAll();
         memberRepository.deleteAll();
     }
@@ -79,10 +85,10 @@ public class NewGroupPurchaseNotifyIntegrationTest {
 
         Cookie sellerCookie = loginAndGetCookie(SELLER_EMAIL);
 
-        mockMvc.perform(post("/api/group-purchases")
-                        .cookie(sellerCookie)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(json(LocalDateTime.now().plusDays(3).withNano(0))))
+        mockMvc.perform(multipart("/api/group-purchases")
+                        .file(TestMultipartFiles.requestPart(json(LocalDateTime.now().plusDays(3).withNano(0))))
+                        .file(TestMultipartFiles.pngImage("daepa.png"))
+                        .cookie(sellerCookie))
                 .andExpect(status().isCreated());
 
         Long id = groupPurchaseRepository.findAll().get(0).getId();
