@@ -8,6 +8,7 @@ spring:
       enabled: false
   jpa:
     open-in-view: false
+    defer-datasource-initialization: true
     properties:
       hibernate:
         format_sql: true
@@ -19,3 +20,9 @@ spring:
     data:
       redis:
         repository-type: indexed
+  sql:
+    init:
+      mode: always
+      encoding: UTF-8
+  cache:
+    type: redis
