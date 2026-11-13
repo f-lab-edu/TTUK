@@ -7,6 +7,8 @@ import java.time.LocalDateTime;
 
 public record GroupPurchaseCreatedEvent(
         Long groupPurchaseId,
+        Long categoryId,
+        String title,
         int basePrice,
         int floorPrice,
         DiscountType discountType,
@@ -18,6 +20,8 @@ public record GroupPurchaseCreatedEvent(
     public static GroupPurchaseCreatedEvent from(GroupPurchase groupPurchase) {
         return new GroupPurchaseCreatedEvent(
                 groupPurchase.getId(),
+                groupPurchase.getCategory().getId(),
+                groupPurchase.getTitle(),
                 groupPurchase.getBasePrice(),
                 groupPurchase.getFloorPrice(),
                 groupPurchase.getDiscountType(),
