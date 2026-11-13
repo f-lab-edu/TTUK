@@ -26,8 +26,11 @@ public class GroupPurchaseRedisRepository {
     private static final String UNLIMITED = "";
     private static final RedisScript<Long> INIT_SCRIPT =
             RedisScript.of(new ClassPathResource("redis/init_group_purchase.lua"), Long.class);
-
     private final StringRedisTemplate redisTemplate;
+
+    @SuppressWarnings("rawtypes")
+    private static final RedisScript<List> JOIN_SCRIPT =
+            RedisScript.of(new ClassPathResource("redis/join_group_purchase.lua"), List.class);
 
     public boolean initialize(GroupPurchaseCreatedEvent event){
 
@@ -98,6 +101,21 @@ public class GroupPurchaseRedisRepository {
         Boolean joined = (Boolean) results.get(1);
 
         return GroupPurchaseLiveDetail.of(values.get(0), values.get(1), values.get(2), joined);
+    }
+
+    public JoinResult join(Long groupPurchaseId, Long memberId) {
+        List<String> keys = List.of(
+                GroupPurchaseRedisKeys.meta(groupPurchaseId),
+                GroupPurchaseRedisKeys.headcount(groupPurchaseId),
+                GroupPurchaseRedisKeys.price(groupPurchaseId),
+                GroupPurchaseRedisKeys.status(groupPurchaseId),
+                GroupPurchaseRedisKeys.participants(groupPurchaseId)
+        );
+
+        @SuppressWarnings("unchecked")
+        List<Long> result = redisTemplate.execute(JOIN_SCRIPT, keys, String.valueOf(memberId));
+
+        return JoinResult.from(result);
     }
 
     private long toEpochSecond(LocalDateTime dateTime) {
