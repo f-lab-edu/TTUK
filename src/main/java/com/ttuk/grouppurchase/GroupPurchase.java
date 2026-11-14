@@ -100,4 +100,8 @@ public class GroupPurchase extends BaseTimeEntity {
         this.closeAt = closeAt;
         this.status = GroupPurchaseStatus.OPEN;
     }
+
+    public boolean isJoinableAt(LocalDateTime now){
+        return status == GroupPurchaseStatus.OPEN && now.isBefore(closeAt);
+    }
 }

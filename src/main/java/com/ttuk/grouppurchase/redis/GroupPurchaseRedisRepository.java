@@ -1,6 +1,8 @@
 package com.ttuk.grouppurchase.redis;
 
 import com.ttuk.global.config.ClockConfig;
+import com.ttuk.grouppurchase.DiscountPolicy;
+import com.ttuk.grouppurchase.GroupPurchase;
 import com.ttuk.grouppurchase.event.GroupPurchaseCreatedEvent;
 import lombok.RequiredArgsConstructor;
 import org.springframework.core.io.ClassPathResource;
@@ -32,30 +34,44 @@ public class GroupPurchaseRedisRepository {
     private static final RedisScript<List> JOIN_SCRIPT =
             RedisScript.of(new ClassPathResource("redis/join_group_purchase.lua"), List.class);
 
+    private static final RedisScript<Long> ROLLBACK_JOIN_SCRIPT =
+            RedisScript.of(new ClassPathResource("redis/rollback_join_group_purchase.lua"), Long.class);
+
+
     public boolean initialize(GroupPurchaseCreatedEvent event){
+        DiscountPolicy policy = new DiscountPolicy(event.basePrice(), event.floorPrice(),
+                event.discountType(), event.discountValue(), event.discountStepSize());
+        return initialize(event.groupPurchaseId(), policy, event.maxHeadcount(), event.closeAt());
+    }
 
-        Long id = event.groupPurchaseId();
-        LocalDateTime closeAt = event.closeAt();
+    public boolean initialize(GroupPurchase groupPurchase) {
+        DiscountPolicy policy = new DiscountPolicy(groupPurchase.getBasePrice(), groupPurchase.getFloorPrice(),
+                groupPurchase.getDiscountType(), groupPurchase.getDiscountValue(), groupPurchase.getDiscountStepSize());
+        return initialize(groupPurchase.getId(), policy, groupPurchase.getMaxHeadcount(), groupPurchase.getCloseAt());
+    }
 
-        List<String> keys = List.of(GroupPurchaseRedisKeys.meta(id),
-                GroupPurchaseRedisKeys.headcount(id),
-                GroupPurchaseRedisKeys.price(id),
-                GroupPurchaseRedisKeys.status(id)
-        );
+    private boolean initialize(Long groupPurchaseId, DiscountPolicy policy, Integer maxHeadcount, LocalDateTime closeAt) {
+
+        List<String> keys = List.of(
+                GroupPurchaseRedisKeys.meta(groupPurchaseId),
+                GroupPurchaseRedisKeys.headcount(groupPurchaseId),
+                GroupPurchaseRedisKeys.price(groupPurchaseId),
+                GroupPurchaseRedisKeys.status(groupPurchaseId));
 
         Long result = redisTemplate.execute(INIT_SCRIPT, keys,
-                String.valueOf(event.basePrice()),
-                String.valueOf(event.floorPrice()),
-                event.discountType().name(),
-                String.valueOf(event.discountValue()),
-                String.valueOf(event.discountStepSize()),
-                event.maxHeadcount() == null ? UNLIMITED : String.valueOf(event.maxHeadcount()),
+                String.valueOf(policy.basePrice()),
+                String.valueOf(policy.floorPrice()),
+                policy.discountType().name(),
+                String.valueOf(policy.discountValue()),
+                String.valueOf(policy.discountStepSize()),
+                maxHeadcount == null ? UNLIMITED : String.valueOf(maxHeadcount),
                 String.valueOf(toEpochSecond(closeAt)),
-                String.valueOf(toEpochSecond(closeAt.plus(KEEP_AFTER_CLOSE)))
-        );
+                String.valueOf(toEpochSecond(closeAt.plus(KEEP_AFTER_CLOSE))));
 
         return Long.valueOf(1L).equals(result);
+
     }
+
 
     public Map<Long, GroupPurchaseLiveValue> findLiveValues(List<Long> groupPurchaseIds){
 
@@ -116,6 +132,18 @@ public class GroupPurchaseRedisRepository {
         List<Long> result = redisTemplate.execute(JOIN_SCRIPT, keys, String.valueOf(memberId));
 
         return JoinResult.from(result);
+    }
+
+    public boolean rollbackJoin(Long groupPurchaseId, Long memberId) {
+        List<String> keys = List.of(
+                GroupPurchaseRedisKeys.meta(groupPurchaseId),
+                GroupPurchaseRedisKeys.headcount(groupPurchaseId),
+                GroupPurchaseRedisKeys.price(groupPurchaseId),
+                GroupPurchaseRedisKeys.status(groupPurchaseId),
+                GroupPurchaseRedisKeys.participants(groupPurchaseId));
+
+        Long result = redisTemplate.execute(ROLLBACK_JOIN_SCRIPT, keys, String.valueOf(memberId));
+        return Long.valueOf(1L).equals(result);
     }
 
     private long toEpochSecond(LocalDateTime dateTime) {
