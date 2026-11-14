@@ -2,17 +2,22 @@ package com.ttuk.participation;
 
 import com.ttuk.global.error.BusinessException;
 import com.ttuk.global.error.ErrorCode;
+import com.ttuk.grouppurchase.GroupPurchase;
 import com.ttuk.grouppurchase.GroupPurchaseRepository;
 import com.ttuk.grouppurchase.redis.GroupPurchaseRedisRepository;
+import com.ttuk.grouppurchase.redis.JoinOutcome;
 import com.ttuk.grouppurchase.redis.JoinResult;
 import com.ttuk.member.MemberRepository;
 import com.ttuk.participation.dto.ParticipationCreateResponse;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.time.Clock;
 import java.time.LocalDateTime;
+import java.util.Optional;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class ParticipationService {
@@ -25,32 +30,60 @@ public class ParticipationService {
 
     public ParticipationCreateResponse join(Long groupPurchaseId, Long memberId, int quantity) {
         JoinResult result = groupPurchaseRedisRepository.join(groupPurchaseId, memberId);
+        if (result.outcome() == JoinOutcome.NOT_INITIALIZED) {
+            result = initializeAndRetry(groupPurchaseId, memberId);
+        }
 
         return switch (result.outcome()) {
             case JOINED -> saveParticipation(groupPurchaseId, memberId, quantity, result);
             case NOT_OPEN -> throw new BusinessException(ErrorCode.GROUP_PURCHASE_NOT_OPEN);
             case FULL -> throw new BusinessException(ErrorCode.GROUP_PURCHASE_FULL);
             case ALREADY_JOINED -> throw new BusinessException(ErrorCode.ALREADY_JOINED);
-            case NOT_INITIALIZED -> throw notInitialized(groupPurchaseId);
+            case NOT_INITIALIZED -> throw new IllegalStateException(
+                    "초기화 후에도 Redis 키가 없습니다. groupPurchaseId=" + groupPurchaseId);
         };
+    }
+
+    private JoinResult initializeAndRetry(Long groupPurchaseId, Long memberId) {
+        Optional<GroupPurchase> found = groupPurchaseRepository.findById(groupPurchaseId);
+        if (found.isEmpty()) {
+            throw new BusinessException(ErrorCode.GROUP_PURCHASE_NOT_FOUND);
+        }
+        GroupPurchase groupPurchase = found.get();
+        if (!groupPurchase.isJoinableAt(LocalDateTime.now(clock))) {
+            throw new BusinessException(ErrorCode.GROUP_PURCHASE_NOT_OPEN);
+        }
+
+        groupPurchaseRedisRepository.initialize(groupPurchase);
+        return groupPurchaseRedisRepository.join(groupPurchaseId, memberId);
     }
 
     private ParticipationCreateResponse saveParticipation(Long groupPurchaseId, Long memberId,
                                                           int quantity, JoinResult result) {
-        participationRepository.save(Participation.builder()
-                .groupPurchase(groupPurchaseRepository.getReferenceById(groupPurchaseId))
-                .member(memberRepository.getReferenceById(memberId))
-                .quantity(quantity)
-                .joinedAt(LocalDateTime.now(clock))
-                .build());
-
+        try {
+            participationRepository.save(Participation.builder()
+                    .groupPurchase(groupPurchaseRepository.getReferenceById(groupPurchaseId))
+                    .member(memberRepository.getReferenceById(memberId))
+                    .quantity(quantity)
+                    .joinedAt(LocalDateTime.now(clock))
+                    .build());
+        } catch (RuntimeException e) {
+            rollbackRedis(groupPurchaseId, memberId, e);
+            throw e;
+        }
         return new ParticipationCreateResponse(result.headcount(), result.price());
     }
 
-    private RuntimeException notInitialized(Long groupPurchaseId) {
-        if (!groupPurchaseRepository.existsById(groupPurchaseId)) {
-            return new BusinessException(ErrorCode.GROUP_PURCHASE_NOT_FOUND);
+    private void rollbackRedis(Long groupPurchaseId, Long memberId, RuntimeException cause) {
+        try {
+            if (!groupPurchaseRedisRepository.rollbackJoin(groupPurchaseId, memberId)) {
+                log.warn("참여 보상: 되돌릴 Redis 참여가 없음. groupPurchaseId={}, memberId={}",
+                        groupPurchaseId, memberId);
+            }
+        } catch (RuntimeException rollbackFailure) {
+            cause.addSuppressed(rollbackFailure);
+            log.error("참여 보상 실패: Redis와 DB가 어긋남. groupPurchaseId={}, memberId={}",
+                    groupPurchaseId, memberId, rollbackFailure);
         }
-        return new IllegalStateException("Redis가 초기화되지 않은 공동구매입니다. id=" + groupPurchaseId);
     }
 }
