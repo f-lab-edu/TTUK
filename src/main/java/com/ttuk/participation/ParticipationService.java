@@ -4,6 +4,8 @@ import com.ttuk.global.error.BusinessException;
 import com.ttuk.global.error.ErrorCode;
 import com.ttuk.grouppurchase.GroupPurchase;
 import com.ttuk.grouppurchase.GroupPurchaseRepository;
+import com.ttuk.grouppurchase.GroupPurchaseStatus;
+import com.ttuk.grouppurchase.redis.CancelResult;
 import com.ttuk.grouppurchase.redis.GroupPurchaseRedisRepository;
 import com.ttuk.grouppurchase.redis.JoinOutcome;
 import com.ttuk.grouppurchase.redis.JoinResult;
@@ -42,6 +44,49 @@ public class ParticipationService {
             case NOT_INITIALIZED -> throw new IllegalStateException(
                     "초기화 후에도 Redis 키가 없습니다. groupPurchaseId=" + groupPurchaseId);
         };
+    }
+
+    public void cancel(Long groupPurchaseId, Long memberId) {
+        LocalDateTime now = LocalDateTime.now(clock);
+        CancelResult result = groupPurchaseRedisRepository.cancel(
+                groupPurchaseId, memberId, now, GroupPurchase.CANCELABLE_BEFORE_CLOSE);
+
+        switch (result.outcome()) {
+            case CANCELED -> cancelJoinedParticipation(groupPurchaseId, memberId, now);
+            case NOT_JOINED -> finishPendingCancel(groupPurchaseId, memberId, now);
+            case NOT_INITIALIZED -> cancelWithoutRedis(groupPurchaseId, memberId, now);
+            case NOT_OPEN -> throw new BusinessException(ErrorCode.GROUP_PURCHASE_NOT_OPEN);
+            case DEADLINE_PASSED -> throw new BusinessException(ErrorCode.CANCEL_DEADLINE_PASSED);
+            case INVALID_HEADCOUNT -> throw new IllegalStateException("Redis 참여 인원 값이 올바르지 않습니다. groupPurchaseId=" + groupPurchaseId);
+        }
+    }
+
+    private void cancelJoinedParticipation(Long groupPurchaseId, Long memberId, LocalDateTime now) {
+        if (participationRepository.cancelJoined(groupPurchaseId, memberId, now) == 0) {
+            log.warn("참여 취소: Redis에서는 취소됐지만 DB에 JOINED 참여가 없음. groupPurchaseId={}, memberId={}", groupPurchaseId, memberId);
+        }
+    }
+
+    private void finishPendingCancel(Long groupPurchaseId, Long memberId, LocalDateTime now) {
+        if (participationRepository.cancelJoined(groupPurchaseId, memberId, now) == 0) {
+            throw new BusinessException(ErrorCode.NOT_JOINED);
+        }
+        log.info("참여 취소: Redis에서 이미 빠진 참여의 DB 기록을 마무리함. groupPurchaseId={}, memberId={}", groupPurchaseId, memberId);
+    }
+
+    private void cancelWithoutRedis(Long groupPurchaseId, Long memberId, LocalDateTime now) {
+        Optional<GroupPurchase> found = groupPurchaseRepository.findById(groupPurchaseId);
+        if (found.isEmpty()) {
+            throw new BusinessException(ErrorCode.GROUP_PURCHASE_NOT_FOUND);
+        }
+        GroupPurchase groupPurchase = found.get();
+        if (groupPurchase.getStatus() != GroupPurchaseStatus.OPEN) {
+            throw new BusinessException(ErrorCode.GROUP_PURCHASE_NOT_OPEN);
+        }
+        if (!now.isBefore(groupPurchase.cancelDeadline())) {
+            throw new BusinessException(ErrorCode.CANCEL_DEADLINE_PASSED);
+        }
+        finishPendingCancel(groupPurchaseId, memberId, now);
     }
 
     private JoinResult initializeAndRetry(Long groupPurchaseId, Long memberId) {
