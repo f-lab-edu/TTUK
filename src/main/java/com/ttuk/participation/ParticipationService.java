@@ -4,6 +4,7 @@ import com.ttuk.global.error.BusinessException;
 import com.ttuk.global.error.ErrorCode;
 import com.ttuk.grouppurchase.GroupPurchase;
 import com.ttuk.grouppurchase.GroupPurchaseRepository;
+import com.ttuk.grouppurchase.GroupPurchaseSettlementService;
 import com.ttuk.grouppurchase.GroupPurchaseStatus;
 import com.ttuk.grouppurchase.redis.CancelResult;
 import com.ttuk.grouppurchase.redis.GroupPurchaseRedisRepository;
@@ -29,6 +30,7 @@ public class ParticipationService {
     private final MemberRepository memberRepository;
     private final ParticipationRepository participationRepository;
     private final Clock clock;
+    private final GroupPurchaseSettlementService settlementService;
 
     public ParticipationCreateResponse join(Long groupPurchaseId, Long memberId, int quantity) {
         JoinResult result = groupPurchaseRedisRepository.join(groupPurchaseId, memberId);
@@ -37,7 +39,14 @@ public class ParticipationService {
         }
 
         return switch (result.outcome()) {
-            case JOINED -> saveParticipation(groupPurchaseId, memberId, quantity, result);
+            case JOINED ->{
+                ParticipationCreateResponse response = saveParticipation(groupPurchaseId, memberId, quantity, result);
+                if(result.closed()){
+                    settleFilledGroupPurchase(groupPurchaseId);
+                }
+                yield response;
+            }
+
             case NOT_OPEN -> throw new BusinessException(ErrorCode.GROUP_PURCHASE_NOT_OPEN);
             case FULL -> throw new BusinessException(ErrorCode.GROUP_PURCHASE_FULL);
             case ALREADY_JOINED -> throw new BusinessException(ErrorCode.ALREADY_JOINED);
@@ -129,6 +138,14 @@ public class ParticipationService {
             cause.addSuppressed(rollbackFailure);
             log.error("참여 보상 실패: Redis와 DB가 어긋남. groupPurchaseId={}, memberId={}",
                     groupPurchaseId, memberId, rollbackFailure);
+        }
+    }
+
+    private void settleFilledGroupPurchase(Long groupPurchaseId) {
+        try {
+            settlementService.settle(groupPurchaseId);
+        } catch (RuntimeException e) {
+            log.error("정원 참 정산 실패: 마감 시각 이후 스케줄러가 다시 정산함. groupPurchaseId={}", groupPurchaseId, e);
         }
     }
 }
