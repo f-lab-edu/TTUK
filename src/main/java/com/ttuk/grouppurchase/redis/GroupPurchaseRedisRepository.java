@@ -15,10 +15,7 @@ import org.springframework.stereotype.Repository;
 
 import java.time.Duration;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 @Repository
 @RequiredArgsConstructor
@@ -40,6 +37,10 @@ public class GroupPurchaseRedisRepository {
     @SuppressWarnings("rawtypes")
     private static final RedisScript<List> CANCEL_SCRIPT =
             RedisScript.of(new ClassPathResource("redis/cancel_join_group_purchase.lua"), List.class);
+
+    @SuppressWarnings("rawtypes")
+    private static final RedisScript<List> SETTLEMENT_SNAPSHOT_SCRIPT =
+            RedisScript.of(new ClassPathResource("redis/read_settlement_snapshot.lua"), List.class);
 
 
     public boolean initialize(GroupPurchaseCreatedEvent event){
@@ -144,6 +145,19 @@ public class GroupPurchaseRedisRepository {
                 String.valueOf(toEpochSecond(now)),
                 String.valueOf(cancelableBefore.toSeconds()));
         return CancelResult.from(result);
+
+    }
+
+    public Optional<SettlementSnapshot> findSettlementSnapshot(Long groupPurchaseId) {
+
+        @SuppressWarnings("unchecked")
+        List<String> result = redisTemplate.execute(SETTLEMENT_SNAPSHOT_SCRIPT, participationKeys(groupPurchaseId));
+
+        if(result.isEmpty()){
+            return Optional.empty();
+        }
+
+        return Optional.of(SettlementSnapshot.from(groupPurchaseId, result));
 
     }
 
