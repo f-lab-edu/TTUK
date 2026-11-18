@@ -111,4 +111,8 @@ public class GroupPurchase extends BaseTimeEntity {
     public LocalDateTime cancelDeadline(){
         return closeAt.minus(CANCELABLE_BEFORE_CLOSE);
     }
+
+    public DiscountPolicy discountPolicy() {
+        return new DiscountPolicy(basePrice, floorPrice, discountType, discountValue, discountStepSize);
+    }
 }
