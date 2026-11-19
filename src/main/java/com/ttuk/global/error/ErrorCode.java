@@ -34,12 +34,14 @@ public enum ErrorCode {
     INVALID_IMAGE(HttpStatus.BAD_REQUEST, "이미지는 1~5장, 장당 5MB 이하의 jpg·png·webp 파일만 등록할 수 있습니다."),
     GROUP_PURCHASE_NOT_FOUND(HttpStatus.NOT_FOUND, "공동구매를 찾을 수 없습니다."),
 
-    GROUP_PURCHASE_NOT_OPEN(HttpStatus.CONFLICT, "참여할 수 없는 상태의 공동구매입니다."),
+    GROUP_PURCHASE_NOT_OPEN(HttpStatus.CONFLICT, "진행 중인 공동구매가 아닙니다."),
     GROUP_PURCHASE_FULL(HttpStatus.CONFLICT, "정원이 마감된 공동구매입니다."),
     ALREADY_JOINED(HttpStatus.CONFLICT, "이미 참여한 공동구매입니다."),
 
     NOT_JOINED(HttpStatus.NOT_FOUND, "참여하지 않은 공동구매입니다."),
     CANCEL_DEADLINE_PASSED(HttpStatus.CONFLICT, "취소 가능 시간이 지났습니다."),
+
+    NOT_GROUP_PURCHASE_OWNER(HttpStatus.FORBIDDEN, "본인이 등록한 공동구매가 아닙니다."),
 
     ;
 
