@@ -50,4 +50,16 @@ public class GroupPurchaseController {
         return ResponseEntity.ok(ApiResponse.success(groupPurchaseQueryService.findDetail(groupPurchaseId, loginMember.memberId())));
     }
 
+    @PostMapping("/{groupPurchaseId}/cancel")
+    @RequireRole(MemberRole.SELLER)
+    public ResponseEntity<ApiResponse<GroupPurchaseCancelResponse>> cancel(
+            @PathVariable Long groupPurchaseId,
+            @Login LoginMember loginMember,
+            @Valid @RequestBody GroupPurchaseCancelRequest request) {
+
+        GroupPurchaseCancelResponse response =
+                groupPurchaseService.cancel(loginMember.memberId(), groupPurchaseId, request);
+        return ResponseEntity.ok(ApiResponse.success(response));
+
+    }
 }

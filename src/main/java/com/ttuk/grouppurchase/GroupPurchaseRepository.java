@@ -40,4 +40,23 @@ public interface GroupPurchaseRepository extends JpaRepository<GroupPurchase, Lo
             """)
     List<Long> findSettlementTargetIds(@Param("threshold") LocalDateTime threshold, Limit limit);
 
+    @Transactional
+    @Modifying
+    @Query("""
+            update GroupPurchase g
+               set g.status = com.ttuk.grouppurchase.GroupPurchaseStatus.CANCELED,
+                   g.cancelReason = :reason,
+                   g.canceledAt = :now,
+                   g.finalHeadcount = :finalHeadcount,
+                   g.finalPrice = :finalPrice,
+                   g.updatedAt = :now
+             where g.id = :groupPurchaseId
+               and g.status = com.ttuk.grouppurchase.GroupPurchaseStatus.OPEN
+            """)
+    int cancelOpen(@Param("groupPurchaseId") Long groupPurchaseId,
+                   @Param("reason") String reason,
+                   @Param("finalHeadcount") int finalHeadcount,
+                   @Param("finalPrice") int finalPrice,
+                   @Param("now") LocalDateTime now);
+
 }
