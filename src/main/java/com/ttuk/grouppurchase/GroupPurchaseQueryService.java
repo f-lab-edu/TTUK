@@ -71,8 +71,12 @@ public class GroupPurchaseQueryService {
         GroupPurchaseStatus status = displayStatus(live.statusOr(row.status()), row.closeAt(), now);
 
         Optional<NextDiscount> next = findNextDiscount(row, currentHeadcount, status);
-        Integer nextDiscountIn = next.isPresent() ? next.get().remainingHeadcount() : null;
-        Integer nextPrice = next.isPresent() ? next.get().price() : null;
+        Integer nextDiscountIn = null;
+        Integer nextPrice = null;
+        if (next.isPresent()) {
+            nextDiscountIn = next.get().remainingHeadcount();
+            nextPrice = next.get().price();
+        }
 
         return GroupPurchaseDetailResponse.of(
                 row, imageUrls, currentHeadcount, live.priceOr(row.basePrice()),

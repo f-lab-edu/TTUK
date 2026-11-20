@@ -18,6 +18,7 @@ import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.web.servlet.MockMvc;
+import static org.hamcrest.Matchers.nullValue;
 
 import java.time.Clock;
 import java.time.LocalDateTime;
@@ -132,7 +133,10 @@ public class GroupPurchaseDetailIntegrationTest {
         mockMvc.perform(get("/api/group-purchases/{id}", groupPurchase.getId())
                         .cookie(buyerCookie))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.status").value(status.name()));
+                .andExpect(jsonPath("$.data.status").value(status.name()))
+                .andExpect(jsonPath("$.data.status").value(status.name()))
+                .andExpect(jsonPath("$.data.nextDiscountIn").value(nullValue()))
+                .andExpect(jsonPath("$.data.nextPrice").value(nullValue()));;
     }
 
     private GroupPurchase saveGroupPurchase(LocalDateTime closeAt) {
