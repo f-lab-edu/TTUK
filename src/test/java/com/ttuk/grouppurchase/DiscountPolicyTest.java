@@ -65,6 +65,14 @@ class DiscountPolicyTest {
         assertThat(tinyPrice.nextDiscount(0, null)).isEmpty();
     }
 
+    @Test
+    @DisplayName("기본가가 커서 기본가 × 할인율이 int 범위를 넘어도 단계당 할인이 정상으로 계산된다")
+    void priceAt_largeBasePrice() {
+        DiscountPolicy expensive = new DiscountPolicy(50_000_000, 10_000_000, DiscountType.RATE, 50, 10);
+
+        assertThat(expensive.priceAt(10)).isEqualTo(25_000_000);
+    }
+
 
 
 
