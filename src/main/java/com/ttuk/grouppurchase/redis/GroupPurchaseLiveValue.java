@@ -1,18 +1,15 @@
 package com.ttuk.grouppurchase.redis;
 
 public record GroupPurchaseLiveValue(
-
         Integer headcount,
         Integer price
-
 ) {
 
-    public static GroupPurchaseLiveValue of(String headcount, String price){
-        return new GroupPurchaseLiveValue(toInteger(headcount), toInteger(price));
-    }
+    public static final GroupPurchaseLiveValue EMPTY = new GroupPurchaseLiveValue(null, null);
 
-    private static Integer toInteger(String value){
-        return value == null ? null : Integer.valueOf(value);
+    public static GroupPurchaseLiveValue of(String headcount, String price) {
+        return new GroupPurchaseLiveValue(
+                RedisValueParser.toInteger(headcount),
+                RedisValueParser.toInteger(price));
     }
-
 }
