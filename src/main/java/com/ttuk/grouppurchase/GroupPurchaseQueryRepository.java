@@ -4,7 +4,6 @@ import com.querydsl.core.types.OrderSpecifier;
 import com.querydsl.core.types.Projections;
 import com.querydsl.core.types.dsl.BooleanExpression;
 import com.querydsl.jpa.impl.JPAQueryFactory;
-import com.ttuk.category.MemberCategoryRepository;
 import com.ttuk.grouppurchase.dto.GroupPurchaseDetailRow;
 import com.ttuk.grouppurchase.dto.GroupPurchaseListRequest;
 import com.ttuk.grouppurchase.dto.GroupPurchaseListRow;
@@ -27,7 +26,7 @@ public class GroupPurchaseQueryRepository {
     private static final int THUMBNAIL_ORDER = 0;
 
     private final JPAQueryFactory queryFactory;
-    private final MemberCategoryRepository memberCategoryRepository;
+
 
     public List<GroupPurchaseListRow> findOpenList(GroupPurchaseListRequest request, LocalDateTime now) {
 
