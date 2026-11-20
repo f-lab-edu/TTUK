@@ -21,6 +21,8 @@ public record GroupPurchaseDetailResponse(
         int discountStepSize,
         int currentHeadcount,
         int currentPrice,
+        Integer nextDiscountIn,
+        Integer nextPrice,
         Integer maxHeadcount,
         LocalDateTime closeAt,
         GroupPurchaseStatus status,
@@ -29,14 +31,18 @@ public record GroupPurchaseDetailResponse(
     public static GroupPurchaseDetailResponse of(GroupPurchaseDetailRow row, List<String> imageUrls,
                                                  int currentHeadcount,
                                                  int currentPrice,
+                                                 Integer nextDiscountIn,
+                                                 Integer nextPrice,
                                                  GroupPurchaseStatus status,
                                                  boolean joined) {
+
         return new GroupPurchaseDetailResponse(
                 row.groupPurchaseId(), row.title(), row.description(), row.unit(),
                 row.categoryName(), row.sellerNickname(), imageUrls,
                 row.basePrice(), row.floorPrice(),
                 row.discountType(), row.discountValue(), row.discountStepSize(),
-                currentHeadcount, currentPrice,
+                currentHeadcount, currentPrice, nextDiscountIn, nextPrice,
                 row.maxHeadcount(), row.closeAt(), status, joined);
+        
     }
 }
