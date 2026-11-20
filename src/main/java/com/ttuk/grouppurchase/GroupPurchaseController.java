@@ -45,8 +45,9 @@ public class GroupPurchaseController {
     }
 
     @GetMapping("/{groupPurchaseId}")
-    public ResponseEntity<ApiResponse<GroupPurchaseDetailResponse>> detail(@PathVariable Long groupPurchaseId){
-        return ResponseEntity.ok(ApiResponse.success(groupPurchaseQueryService.findDetail(groupPurchaseId)));
+    public ResponseEntity<ApiResponse<GroupPurchaseDetailResponse>> detail(@PathVariable Long groupPurchaseId,
+                                                                           @Login LoginMember loginMember){
+        return ResponseEntity.ok(ApiResponse.success(groupPurchaseQueryService.findDetail(groupPurchaseId, loginMember.memberId())));
     }
 
 }

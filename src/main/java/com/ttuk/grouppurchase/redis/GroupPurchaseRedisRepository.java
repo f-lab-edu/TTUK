@@ -3,8 +3,10 @@ package com.ttuk.grouppurchase.redis;
 import com.ttuk.global.config.ClockConfig;
 import com.ttuk.grouppurchase.event.GroupPurchaseCreatedEvent;
 import lombok.RequiredArgsConstructor;
-import org.jspecify.annotations.Nullable;
 import org.springframework.core.io.ClassPathResource;
+import org.springframework.data.redis.connection.DefaultStringRedisConnection;
+import org.springframework.data.redis.connection.StringRedisConnection;
+import org.springframework.data.redis.core.RedisCallback;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.script.RedisScript;
 import org.springframework.stereotype.Repository;
@@ -76,6 +78,26 @@ public class GroupPurchaseRedisRepository {
 
         return result;
 
+    }
+
+    public GroupPurchaseLiveDetail findLiveDetail(Long groupPurchaseId, Long memberId) {
+        String headcountKey = GroupPurchaseRedisKeys.headcount(groupPurchaseId);
+        String priceKey = GroupPurchaseRedisKeys.price(groupPurchaseId);
+        String statusKey = GroupPurchaseRedisKeys.status(groupPurchaseId);
+        String participantsKey = GroupPurchaseRedisKeys.participants(groupPurchaseId);
+
+        List<Object> results = redisTemplate.executePipelined((RedisCallback<Object>) connection -> {
+            StringRedisConnection stringConnection = new DefaultStringRedisConnection(connection);
+            stringConnection.mGet(headcountKey, priceKey, statusKey);
+            stringConnection.sIsMember(participantsKey, String.valueOf(memberId));
+            return null;
+        });
+
+        @SuppressWarnings("unchecked")
+        List<String> values = (List<String>) results.get(0);
+        Boolean joined = (Boolean) results.get(1);
+
+        return GroupPurchaseLiveDetail.of(values.get(0), values.get(1), values.get(2), joined);
     }
 
     private long toEpochSecond(LocalDateTime dateTime) {
