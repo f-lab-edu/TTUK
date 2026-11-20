@@ -3,6 +3,7 @@ package com.ttuk.grouppurchase.redis;
 import com.ttuk.global.config.ClockConfig;
 import com.ttuk.grouppurchase.event.GroupPurchaseCreatedEvent;
 import lombok.RequiredArgsConstructor;
+import org.jspecify.annotations.Nullable;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.script.RedisScript;
@@ -10,7 +11,10 @@ import org.springframework.stereotype.Repository;
 
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 @Repository
 @RequiredArgsConstructor
@@ -46,6 +50,32 @@ public class GroupPurchaseRedisRepository {
         );
 
         return Long.valueOf(1L).equals(result);
+    }
+
+    public Map<Long, GroupPurchaseLiveValue> findLiveValues(List<Long> groupPurchaseIds){
+
+        if(groupPurchaseIds.isEmpty()){
+            return Map.of();
+        }
+
+        List<String> keys = new ArrayList<>(groupPurchaseIds.size() * 2);
+        for(Long id : groupPurchaseIds){
+            keys.add(GroupPurchaseRedisKeys.headcount(id));
+            keys.add(GroupPurchaseRedisKeys.price(id));
+        }
+
+        List<String> values = redisTemplate.opsForValue().multiGet(keys);
+
+        Map<Long, GroupPurchaseLiveValue> result = new HashMap<>(groupPurchaseIds.size());
+
+        for(int i = 0; i < groupPurchaseIds.size(); i++){
+            String headcount = values == null ? null : values.get(i * 2);
+            String price = values == null ? null : values.get(i * 2 + 1);
+            result.put(groupPurchaseIds.get(i), GroupPurchaseLiveValue.of(headcount, price));
+        }
+
+        return result;
+
     }
 
     private long toEpochSecond(LocalDateTime dateTime) {

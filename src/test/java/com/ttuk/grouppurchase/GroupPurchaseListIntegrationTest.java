@@ -159,6 +159,23 @@ public class GroupPurchaseListIntegrationTest {
                 .andExpect(jsonPath("$.data.content[1].title").value("대파 한 단"));
     }
 
+    @Test
+    @DisplayName("Redis 인원·단가가 숫자가 아니면 그 공동구매만 0명·기본가로 보이고 목록은 정상이다")
+    void list_invalidRedisValue() throws Exception {
+        LocalDateTime now = LocalDateTime.now(clock);
+        GroupPurchase broken = save("대파 한 단", FRESH_FOOD_ID, 3000, now.plusDays(1));
+        GroupPurchase normal = save("양파 3kg", FRESH_FOOD_ID, 8000, now.plusDays(2));
+        setLiveValues(broken.getId(), "abc", "2850.5");
+        setLiveValues(normal.getId(), "12", "7600");
+
+        mockMvc.perform(get("/api/group-purchases").cookie(loginAndGetCookie()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.content[0].currentHeadcount").value(0))
+                .andExpect(jsonPath("$.data.content[0].currentPrice").value(3000))
+                .andExpect(jsonPath("$.data.content[1].currentHeadcount").value(12))
+                .andExpect(jsonPath("$.data.content[1].currentPrice").value(7600));
+    }
+
     private GroupPurchase save(String title, long categoryId, int basePrice, LocalDateTime closeAt) {
         GroupPurchase groupPurchase = groupPurchaseRepository.save(GroupPurchase.builder()
                 .seller(seller)
