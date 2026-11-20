@@ -9,6 +9,7 @@ import com.ttuk.grouppurchase.dto.GroupPurchaseListRow;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 import static com.ttuk.category.QCategory.category;
@@ -23,7 +24,7 @@ public class GroupPurchaseQueryRepository {
 
     private final JPAQueryFactory queryFactory;
 
-    public List<GroupPurchaseListRow> findopenList(GroupPurchaseListRequest request){
+    public List<GroupPurchaseListRow> findOpenList(GroupPurchaseListRequest request, LocalDateTime now) {
 
         return queryFactory
                 .select(Projections.constructor(GroupPurchaseListRow.class,
@@ -40,34 +41,37 @@ public class GroupPurchaseQueryRepository {
                 .leftJoin(groupPurchaseImage).on(
                         groupPurchaseImage.groupPurchase.eq(groupPurchase),
                         groupPurchaseImage.sortOrder.eq(THUMBNAIL_ORDER))
-                .where(groupPurchase.status.eq(GroupPurchaseStatus.OPEN),
+                .where(openAt(now),
                         categoryIdEq(request.categoryId()))
                 .orderBy(orderBy(request.sort()))
                 .offset((long) request.page() * request.size())
                 .limit(request.size())
                 .fetch();
-
     }
 
-    public long countOpen(Long categoryId){
+    public long countOpen(Long categoryId, LocalDateTime now) {
         Long count = queryFactory
                 .select(groupPurchase.count())
                 .from(groupPurchase)
-                .where(groupPurchase.status.eq(GroupPurchaseStatus.OPEN),
+                .where(openAt(now),
                         categoryIdEq(categoryId))
                 .fetchOne();
         return count == null ? 0 : count;
     }
 
-    private BooleanExpression categoryIdEq(Long categoryId){
+    private BooleanExpression openAt(LocalDateTime now) {
+        return groupPurchase.status.eq(GroupPurchaseStatus.OPEN)
+                .and(groupPurchase.closeAt.gt(now));
+    }
+
+    private BooleanExpression categoryIdEq(Long categoryId) {
         return categoryId == null ? null : groupPurchase.category.id.eq(categoryId);
     }
 
-    private OrderSpecifier<?>[] orderBy(GroupPurchaseSort sort){
-        return switch (sort){
+    private OrderSpecifier<?>[] orderBy(GroupPurchaseSort sort) {
+        return switch (sort) {
             case CLOSE_AT -> new OrderSpecifier<?>[]{groupPurchase.closeAt.asc(), groupPurchase.id.asc()};
-            case LATEST -> new  OrderSpecifier<?>[]{groupPurchase.createdAt.desc()};
+            case LATEST -> new OrderSpecifier<?>[]{groupPurchase.id.desc()};
         };
     }
-
 }
