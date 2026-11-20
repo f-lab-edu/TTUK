@@ -4,13 +4,13 @@ import com.querydsl.core.types.OrderSpecifier;
 import com.querydsl.core.types.Projections;
 import com.querydsl.core.types.dsl.BooleanExpression;
 import com.querydsl.jpa.impl.JPAQueryFactory;
-import com.ttuk.category.MemberCategoryRepository;
 import com.ttuk.grouppurchase.dto.GroupPurchaseDetailRow;
 import com.ttuk.grouppurchase.dto.GroupPurchaseListRequest;
 import com.ttuk.grouppurchase.dto.GroupPurchaseListRow;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -26,9 +26,9 @@ public class GroupPurchaseQueryRepository {
     private static final int THUMBNAIL_ORDER = 0;
 
     private final JPAQueryFactory queryFactory;
-    private final MemberCategoryRepository memberCategoryRepository;
 
-    public List<GroupPurchaseListRow> findopenList(GroupPurchaseListRequest request){
+
+    public List<GroupPurchaseListRow> findOpenList(GroupPurchaseListRequest request, LocalDateTime now) {
 
         return queryFactory
                 .select(Projections.constructor(GroupPurchaseListRow.class,
@@ -45,26 +45,25 @@ public class GroupPurchaseQueryRepository {
                 .leftJoin(groupPurchaseImage).on(
                         groupPurchaseImage.groupPurchase.eq(groupPurchase),
                         groupPurchaseImage.sortOrder.eq(THUMBNAIL_ORDER))
-                .where(groupPurchase.status.eq(GroupPurchaseStatus.OPEN),
+                .where(openAt(now),
                         categoryIdEq(request.categoryId()))
                 .orderBy(orderBy(request.sort()))
                 .offset((long) request.page() * request.size())
                 .limit(request.size())
                 .fetch();
-
     }
 
-    public long countOpen(Long categoryId){
+    public long countOpen(Long categoryId, LocalDateTime now) {
         Long count = queryFactory
                 .select(groupPurchase.count())
                 .from(groupPurchase)
-                .where(groupPurchase.status.eq(GroupPurchaseStatus.OPEN),
+                .where(openAt(now),
                         categoryIdEq(categoryId))
                 .fetchOne();
         return count == null ? 0 : count;
     }
 
-    public Optional<GroupPurchaseDetailRow> findDetail(Long id){
+    public Optional<GroupPurchaseDetailRow> findDetail(Long id) {
         GroupPurchaseDetailRow row = queryFactory
                 .select(Projections.constructor(GroupPurchaseDetailRow.class,
                         groupPurchase.id,
@@ -88,10 +87,9 @@ public class GroupPurchaseQueryRepository {
                 .fetchOne();
 
         return Optional.ofNullable(row);
-
     }
 
-    public List<String> findImageKeys(Long groupPurchaseId){
+    public List<String> findImageKeys(Long groupPurchaseId) {
         return queryFactory
                 .select(groupPurchaseImage.imageKey)
                 .from(groupPurchaseImage)
@@ -100,15 +98,19 @@ public class GroupPurchaseQueryRepository {
                 .fetch();
     }
 
-    private BooleanExpression categoryIdEq(Long categoryId){
+    private BooleanExpression openAt(LocalDateTime now) {
+        return groupPurchase.status.eq(GroupPurchaseStatus.OPEN)
+                .and(groupPurchase.closeAt.gt(now));
+    }
+
+    private BooleanExpression categoryIdEq(Long categoryId) {
         return categoryId == null ? null : groupPurchase.category.id.eq(categoryId);
     }
 
-    private OrderSpecifier<?>[] orderBy(GroupPurchaseSort sort){
-        return switch (sort){
+    private OrderSpecifier<?>[] orderBy(GroupPurchaseSort sort) {
+        return switch (sort) {
             case CLOSE_AT -> new OrderSpecifier<?>[]{groupPurchase.closeAt.asc(), groupPurchase.id.asc()};
-            case LATEST -> new  OrderSpecifier<?>[]{groupPurchase.createdAt.desc()};
+            case LATEST -> new OrderSpecifier<?>[]{groupPurchase.id.desc()};
         };
     }
-
 }

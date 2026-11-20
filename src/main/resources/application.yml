@@ -1,4 +1,8 @@
 spring:
+  data:
+    redis:
+      timeout: 500ms
+      connect-timeout: 1s
   application:
     name: ttuk
   profiles:
