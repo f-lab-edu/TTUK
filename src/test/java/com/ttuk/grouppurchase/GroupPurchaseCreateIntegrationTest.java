@@ -84,7 +84,7 @@ public class GroupPurchaseCreateIntegrationTest {
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.data.groupPurchaseId").isNumber())
                 .andExpect(jsonPath("$.data.status").value("OPEN"))
-                .andExpect(jsonPath("$.data.thumbnailUrl").isString());;
+                .andExpect(jsonPath("$.data.thumbnailUrl").isString());
 
         List<GroupPurchase> saved = groupPurchaseRepository.findAll();
         assertThat(saved).hasSize(1);

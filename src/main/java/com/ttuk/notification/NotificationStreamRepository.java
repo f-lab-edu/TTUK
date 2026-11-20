@@ -29,9 +29,9 @@ public class NotificationStreamRepository {
         fields.put("categoryId", String.valueOf(categoryId));
         fields.put("title", title);
 
-        MapRecord<String, String, String> record = StreamRecords.newRecord().in(STREAM_KEY).ofMap(fields);
+        MapRecord<String, String, String> message = StreamRecords.newRecord().in(STREAM_KEY).ofMap(fields);
 
-        return redisTemplate.opsForStream().add(record, XAddOptions.trim(RedisStreamCommands.TrimOptions.maxLen(MAX_LENGTH).approximate()));
+        return redisTemplate.opsForStream().add(message, XAddOptions.trim(RedisStreamCommands.TrimOptions.maxLen(MAX_LENGTH).approximate()));
 
     }
 
