@@ -4,9 +4,7 @@ import com.querydsl.core.types.OrderSpecifier;
 import com.querydsl.core.types.Projections;
 import com.querydsl.core.types.dsl.BooleanExpression;
 import com.querydsl.jpa.impl.JPAQueryFactory;
-import com.ttuk.grouppurchase.dto.GroupPurchaseDetailRow;
-import com.ttuk.grouppurchase.dto.GroupPurchaseListRequest;
-import com.ttuk.grouppurchase.dto.GroupPurchaseListRow;
+import com.ttuk.grouppurchase.dto.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Repository;
 
@@ -96,6 +94,53 @@ public class GroupPurchaseQueryRepository {
                 .where(groupPurchaseImage.groupPurchase.id.eq(groupPurchaseId))
                 .orderBy(groupPurchaseImage.sortOrder.asc())
                 .fetch();
+    }
+
+    public List<SellerGroupPurchaseRow> findSellerList(Long sellerId, SellerGroupPurchaseListRequest request,
+                                                       LocalDateTime now) {
+        return queryFactory
+                .select(Projections.constructor(SellerGroupPurchaseRow.class,
+                        groupPurchase.id,
+                        groupPurchase.title,
+                        groupPurchase.status,
+                        groupPurchase.basePrice,
+                        groupPurchase.maxHeadcount,
+                        groupPurchase.finalHeadcount,
+                        groupPurchase.finalPrice,
+                        groupPurchase.closeAt,
+                        groupPurchase.createdAt))
+                .from(groupPurchase)
+                .where(groupPurchase.seller.id.eq(sellerId),
+                        displayStatusEq(request.status(), now))
+                .orderBy(groupPurchase.id.desc())
+                .offset((long) request.page() * request.size())
+                .limit(request.size())
+                .fetch();
+    }
+
+    public long countSellerList(Long sellerId, GroupPurchaseStatus status, LocalDateTime now) {
+
+        Long count = queryFactory.select(groupPurchase.count())
+                .from(groupPurchase)
+                .where(groupPurchase.seller.id.eq(sellerId), displayStatusEq(status, now))
+                .fetchOne();
+        return count == null ? 0 : count;
+
+    }
+
+    private BooleanExpression displayStatusEq(GroupPurchaseStatus status, LocalDateTime now) {
+
+        if(status == null){
+            return null;
+        }
+        return switch (status){
+            case OPEN -> openAt(now);
+            case CLOSED -> groupPurchase.status.eq(GroupPurchaseStatus.CLOSED)
+                    .or(groupPurchase.status.eq(GroupPurchaseStatus.OPEN).and(groupPurchase.closeAt.loe(now)));
+            case CANCELED -> groupPurchase.status.eq(GroupPurchaseStatus.CANCELED);
+
+        };
+
     }
 
     private BooleanExpression openAt(LocalDateTime now) {

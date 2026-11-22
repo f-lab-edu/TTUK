@@ -16,6 +16,10 @@ import java.time.LocalDateTime;
 @Entity
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
+@Table(indexes = {
+        @Index(name = "idx_participation_group_purchase_status_quantity",
+                columnList = "group_purchase_id, status, quantity")
+})
 public class Participation extends BaseTimeEntity {
 
     @Id
