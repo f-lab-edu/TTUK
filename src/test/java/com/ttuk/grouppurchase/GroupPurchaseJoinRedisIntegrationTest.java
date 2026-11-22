@@ -129,6 +129,58 @@ class GroupPurchaseJoinRedisIntegrationTest {
                 .isEqualTo("0");
     }
 
+    @Test
+    @DisplayName("정원을 채운 회원이 다시 참여하면 FULL이 아니라 ALREADY_JOINED다")
+    void join_retryAfterFull() {
+        initialize(2, 10);
+        groupPurchaseRedisRepository.join(GROUP_PURCHASE_ID, 1L);
+        groupPurchaseRedisRepository.join(GROUP_PURCHASE_ID, 2L);
+
+        JoinResult retry = groupPurchaseRedisRepository.join(GROUP_PURCHASE_ID, 2L);
+
+        assertThat(retry.outcome()).isEqualTo(JoinOutcome.ALREADY_JOINED);
+    }
+
+    @Test
+    @DisplayName("인원 값이 숫자가 아니면 INVALID_HEADCOUNT이고 참여자에 추가하지 않는다")
+    void join_invalidHeadcount() {
+        initialize(null, 10);
+        redisTemplate.opsForValue().set(GroupPurchaseRedisKeys.headcount(GROUP_PURCHASE_ID), "abc");
+
+        JoinResult result = groupPurchaseRedisRepository.join(GROUP_PURCHASE_ID, 7L);
+
+        assertThat(result.outcome()).isEqualTo(JoinOutcome.INVALID_HEADCOUNT);
+        assertThat(redisTemplate.hasKey(participantsKey())).isFalse();
+    }
+
+    @Test
+    @DisplayName("meta에 만료가 없어도 참여자 Set이 지워지지 않는다")
+    void join_metaWithoutExpire() {
+        initialize(50, 10);
+        redisTemplate.persist(GroupPurchaseRedisKeys.meta(GROUP_PURCHASE_ID));
+
+        JoinResult result = groupPurchaseRedisRepository.join(GROUP_PURCHASE_ID, 7L);
+
+        assertThat(result.outcome()).isEqualTo(JoinOutcome.JOINED);
+        assertThat(redisTemplate.opsForSet().isMember(participantsKey(), "7")).isTrue();
+    }
+
+    @Test
+    @DisplayName("기본가가 커도 Lua 단가가 DiscountPolicy와 같다")
+    void join_largeBasePriceMatchesDiscountPolicy() {
+        closeAt = LocalDateTime.now(clock).plusDays(3).withNano(0);
+        groupPurchaseRedisRepository.initialize(new GroupPurchaseCreatedEvent(
+                GROUP_PURCHASE_ID, 1L, "한우 세트",
+                50_000_000, 10_000_000, DiscountType.RATE, 50, 2,
+                null, closeAt));
+        DiscountPolicy policy = new DiscountPolicy(50_000_000, 10_000_000, DiscountType.RATE, 50, 2);
+
+        groupPurchaseRedisRepository.join(GROUP_PURCHASE_ID, 1L);
+        JoinResult result = groupPurchaseRedisRepository.join(GROUP_PURCHASE_ID, 2L);
+
+        assertThat(result.price()).isEqualTo(policy.priceAt(2));
+    }
+
     private void initialize(Integer maxHeadcount, int discountStepSize) {
         closeAt = LocalDateTime.now(clock).plusDays(3).withNano(0);
         groupPurchaseRedisRepository.initialize(new GroupPurchaseCreatedEvent(
