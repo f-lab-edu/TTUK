@@ -18,6 +18,7 @@ import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.web.servlet.MockMvc;
+import static org.hamcrest.Matchers.nullValue;
 
 import java.time.Clock;
 import java.time.LocalDateTime;
@@ -27,6 +28,9 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 
 @SpringBootTest
@@ -53,6 +57,8 @@ public class GroupPurchaseDetailIntegrationTest {
     PasswordEncoder passwordEncoder;
     @Autowired
     Clock clock;
+    @Autowired
+    JdbcTemplate jdbcTemplate;
 
     private Member seller;
     private Cookie buyerCookie;
@@ -87,6 +93,8 @@ public class GroupPurchaseDetailIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.groupPurchaseId").value(groupPurchase.getId()))
                 .andExpect(jsonPath("$.data.title").value("대파 한 단"))
+                .andExpect(jsonPath("$.data.description").value("진도 대파, 11/12 수확"))
+                .andExpect(jsonPath("$.data.unit").value("단"))
                 .andExpect(jsonPath("$.data.categoryName").value("신선식품"))
                 .andExpect(jsonPath("$.data.sellerNickname").value("진도농장"))
                 .andExpect(jsonPath("$.data.basePrice").value(3000))
@@ -112,6 +120,23 @@ public class GroupPurchaseDetailIntegrationTest {
                         .cookie(buyerCookie))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.error.code").value("GROUP_PURCHASE_NOT_FOUND"));
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = GroupPurchaseStatus.class, names = {"CLOSED", "CANCELED"})
+    @DisplayName("마감·취소된 공동구매도 상세는 열리고 상태가 그대로 내려간다")
+    void detail_closedOrCanceled(GroupPurchaseStatus status) throws Exception {
+        GroupPurchase groupPurchase = saveGroupPurchase(LocalDateTime.now(clock).plusDays(3).withNano(0));
+        jdbcTemplate.update("UPDATE group_purchase SET status = ? WHERE id = ?",
+                status.name(), groupPurchase.getId());
+
+        mockMvc.perform(get("/api/group-purchases/{id}", groupPurchase.getId())
+                        .cookie(buyerCookie))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.status").value(status.name()))
+                .andExpect(jsonPath("$.data.status").value(status.name()))
+                .andExpect(jsonPath("$.data.nextDiscountIn").value(nullValue()))
+                .andExpect(jsonPath("$.data.nextPrice").value(nullValue()));;
     }
 
     private GroupPurchase saveGroupPurchase(LocalDateTime closeAt) {
