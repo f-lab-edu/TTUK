@@ -30,6 +30,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.print;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -55,6 +56,8 @@ class GroupPurchaseDetailLiveIntegrationTest {
     PasswordEncoder passwordEncoder;
     @Autowired
     Clock clock;
+    @Autowired
+    JdbcTemplate jdbcTemplate;
 
     private Member seller;
     private Member buyer;
@@ -110,6 +113,39 @@ class GroupPurchaseDetailLiveIntegrationTest {
                 .andExpect(jsonPath("$.data.currentPrice").value(3000))
                 .andExpect(jsonPath("$.data.status").value("OPEN"))
                 .andExpect(jsonPath("$.data.joined").value(false));
+    }
+
+    @Test
+    @DisplayName("상태가 OPEN이어도 마감 시각이 지났으면 CLOSED로 내려간다")
+    void detail_closedByTime() throws Exception {
+        GroupPurchase groupPurchase = saveGroupPurchase();
+        jdbcTemplate.update("UPDATE group_purchase SET close_at = ? WHERE id = ?",
+                LocalDateTime.now(clock).minusMinutes(1), groupPurchase.getId());
+
+        mockMvc.perform(get("/api/group-purchases/{id}", groupPurchase.getId()).cookie(buyerCookie))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.status").value("CLOSED"));
+    }
+
+    @Test
+    @DisplayName("Redis 상태를 모르거나 인원이 숫자가 아니면 DB 상태와 0명으로 내려간다")
+    void detail_invalidLiveValues() throws Exception {
+        GroupPurchase groupPurchase = saveGroupPurchase();
+        Long id = groupPurchase.getId();
+
+        redisTemplate.opsForValue().set(GroupPurchaseRedisKeys.headcount(id), "abc");
+        redisTemplate.opsForValue().set(GroupPurchaseRedisKeys.price(id), "2850");
+        redisTemplate.opsForValue().set(GroupPurchaseRedisKeys.status(id), "PAUSED");
+        redisKeys = List.of(
+                GroupPurchaseRedisKeys.headcount(id),
+                GroupPurchaseRedisKeys.price(id),
+                GroupPurchaseRedisKeys.status(id));
+
+        mockMvc.perform(get("/api/group-purchases/{id}", id).cookie(buyerCookie))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.currentHeadcount").value(0))
+                .andExpect(jsonPath("$.data.currentPrice").value(2850))
+                .andExpect(jsonPath("$.data.status").value("OPEN"));
     }
 
     private GroupPurchase saveGroupPurchase() {

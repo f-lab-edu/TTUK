@@ -130,6 +130,52 @@ public class GroupPurchaseListIntegrationTest {
                 .andExpect(jsonPath("$.error.code").value("INVALID_INPUT"));
     }
 
+    @Test
+    @DisplayName("상태가 OPEN이어도 마감 시각이 지났으면 목록과 전체 개수에서 빠진다")
+    void list_excludesClosedByTime() throws Exception {
+        LocalDateTime now = LocalDateTime.now(clock);
+        save("대파 한 단", FRESH_FOOD_ID, 3000, now.plusDays(1));
+        save("양파 3kg", FRESH_FOOD_ID, 8000, now.minusMinutes(1));
+
+        mockMvc.perform(get("/api/group-purchases").cookie(loginAndGetCookie()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.content.length()").value(1))
+                .andExpect(jsonPath("$.data.content[0].title").value("대파 한 단"))
+                .andExpect(jsonPath("$.data.totalElements").value(1));
+    }
+
+    @Test
+    @DisplayName("최신순이면 나중에 등록한 공동구매가 먼저 나온다")
+    void list_latestOrder() throws Exception {
+        LocalDateTime now = LocalDateTime.now(clock);
+        save("대파 한 단", FRESH_FOOD_ID, 3000, now.plusDays(1));
+        save("양파 3kg", FRESH_FOOD_ID, 8000, now.plusDays(2));
+
+        mockMvc.perform(get("/api/group-purchases")
+                        .param("sort", "latest")
+                        .cookie(loginAndGetCookie()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.content[0].title").value("양파 3kg"))
+                .andExpect(jsonPath("$.data.content[1].title").value("대파 한 단"));
+    }
+
+    @Test
+    @DisplayName("Redis 인원·단가가 숫자가 아니면 그 공동구매만 0명·기본가로 보이고 목록은 정상이다")
+    void list_invalidRedisValue() throws Exception {
+        LocalDateTime now = LocalDateTime.now(clock);
+        GroupPurchase broken = save("대파 한 단", FRESH_FOOD_ID, 3000, now.plusDays(1));
+        GroupPurchase normal = save("양파 3kg", FRESH_FOOD_ID, 8000, now.plusDays(2));
+        setLiveValues(broken.getId(), "abc", "2850.5");
+        setLiveValues(normal.getId(), "12", "7600");
+
+        mockMvc.perform(get("/api/group-purchases").cookie(loginAndGetCookie()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.content[0].currentHeadcount").value(0))
+                .andExpect(jsonPath("$.data.content[0].currentPrice").value(3000))
+                .andExpect(jsonPath("$.data.content[1].currentHeadcount").value(12))
+                .andExpect(jsonPath("$.data.content[1].currentPrice").value(7600));
+    }
+
     private GroupPurchase save(String title, long categoryId, int basePrice, LocalDateTime closeAt) {
         GroupPurchase groupPurchase = groupPurchaseRepository.save(GroupPurchase.builder()
                 .seller(seller)
