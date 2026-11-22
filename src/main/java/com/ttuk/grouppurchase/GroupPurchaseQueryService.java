@@ -8,6 +8,8 @@ import com.ttuk.grouppurchase.dto.*;
 import com.ttuk.grouppurchase.redis.GroupPurchaseLiveDetail;
 import com.ttuk.grouppurchase.redis.GroupPurchaseLiveValue;
 import com.ttuk.grouppurchase.redis.GroupPurchaseRedisRepository;
+import com.ttuk.participation.ParticipationRepository;
+import com.ttuk.participation.dto.JoinedQuantity;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataAccessException;
@@ -16,10 +18,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
 
 @Slf4j
 @Service
@@ -31,6 +30,7 @@ public class GroupPurchaseQueryService {
     private final GroupPurchaseRedisRepository redisRepository;
     private final S3ImageStorage imageStorage;
     private final Clock clock;
+    private final ParticipationRepository participationRepository;
 
     public PageResponse<GroupPurchaseSummaryResponse> findOpenList(GroupPurchaseListRequest request) {
         LocalDateTime now = LocalDateTime.now(clock);
@@ -83,6 +83,36 @@ public class GroupPurchaseQueryService {
                 nextDiscountIn, nextPrice, status, live.joined());
     }
 
+    public PageResponse<SellerGroupPurchaseResponse> findSellerList(Long sellerId, SellerGroupPurchaseListRequest request) {
+
+        LocalDateTime now = LocalDateTime.now(clock);
+        List<SellerGroupPurchaseRow> rows = queryRepository.findSellerList(sellerId, request, now);
+        long totalElements = queryRepository.countSellerList(sellerId, request.status(), now);
+
+        List<Long> openIds = new ArrayList<>();
+        List<Long> soldIds = new ArrayList<>();
+
+        for (SellerGroupPurchaseRow row : rows) {
+            if (row.status() == GroupPurchaseStatus.CANCELED) {
+                continue;
+            }
+            soldIds.add(row.groupPurchaseId());
+            if (row.status() == GroupPurchaseStatus.OPEN) {
+                openIds.add(row.groupPurchaseId());
+            }
+        }
+        Map<Long, GroupPurchaseLiveValue> liveValues = openIds.isEmpty() ? Map.of() : findLiveValues(openIds);
+        Map<Long, Long> quantities = findJoinedQuantities(soldIds);
+
+        List<SellerGroupPurchaseResponse> content = new ArrayList<>(rows.size());
+        for (SellerGroupPurchaseRow row : rows) {
+            content.add(toSellerResponse(row, liveValues, quantities, now));
+        }
+
+        return PageResponse.of(content, request.page(), request.size(), totalElements);
+
+    }
+
     private Optional<NextDiscount> findNextDiscount(GroupPurchaseDetailRow row,
                                                     int currentHeadcount,
                                                     GroupPurchaseStatus status) {
@@ -117,4 +147,45 @@ public class GroupPurchaseQueryService {
             return GroupPurchaseLiveDetail.EMPTY;
         }
     }
+
+    private SellerGroupPurchaseResponse toSellerResponse(SellerGroupPurchaseRow row,
+                                                         Map<Long, GroupPurchaseLiveValue> liveValues,
+                                                         Map<Long, Long> quantities,
+                                                         LocalDateTime now) {
+
+        GroupPurchaseStatus status = displayStatus(row.status(), row.closeAt(), now);
+        if(row.status() == GroupPurchaseStatus.CANCELED) {
+            return SellerGroupPurchaseResponse.of(
+                    row, status, row.finalHeadcount(), row.finalPrice(), null, null);
+        }
+
+        Long totalQuantity = quantities.getOrDefault(row.groupPurchaseId(), 0L);
+        if(row.status() == GroupPurchaseStatus.CLOSED) {
+
+            long totalAmount = totalQuantity * row.finalPrice();
+            return SellerGroupPurchaseResponse.of(
+                    row, status, row.finalHeadcount(), row.finalPrice(), totalQuantity, totalAmount);
+
+        }
+
+        GroupPurchaseLiveValue live = liveValues.getOrDefault(row.groupPurchaseId(), GroupPurchaseLiveValue.EMPTY);
+        return SellerGroupPurchaseResponse.of(
+                row, status, live.headcountOrZero(), live.priceOr(row.basePrice()), totalQuantity, null);
+
+    }
+
+    private Map<Long, Long> findJoinedQuantities(List<Long> groupPurchaseIds) {
+
+        Map<Long, Long> quantities = new HashMap<>();
+        if(groupPurchaseIds.isEmpty()){
+            return quantities;
+        }
+
+        for (JoinedQuantity joined : participationRepository.sumJoinedQuantities(groupPurchaseIds)) {
+            quantities.put(joined.groupPurchaseId(), joined.totalQuantity());
+        }
+        return quantities;
+
+    }
+
 }
