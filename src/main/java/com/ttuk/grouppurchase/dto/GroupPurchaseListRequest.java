@@ -19,7 +19,7 @@ public record GroupPurchaseListRequest(
 ) {
 
     private static final int DEFAULT_PAGE = 0;
-    private static final int DEFAULT_SIZE = 50;
+    private static final int DEFAULT_SIZE = 20;
 
     public GroupPurchaseListRequest {
 

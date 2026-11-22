@@ -23,10 +23,12 @@ public record GroupPurchaseCreateRequest(
 
         @NotNull
         @Positive
+        @Max(10_000_000)
         Integer basePrice,
 
         @NotNull
         @Positive
+        @Max(10_000_000)
         Integer floorPrice,
 
         @NotNull
