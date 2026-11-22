@@ -11,7 +11,7 @@ public enum DiscountType {
 
         @Override
         public int discountPerStep(int basePrice, int discountValue){
-            return basePrice * discountValue / PERCENT;
+            return (int) ((long) basePrice * discountValue / PERCENT);
         }
 
     },
