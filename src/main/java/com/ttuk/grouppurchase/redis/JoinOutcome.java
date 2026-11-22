@@ -6,7 +6,8 @@ public enum JoinOutcome {
     NOT_INITIALIZED(-1),
     NOT_OPEN(-2),
     ALREADY_JOINED(-3),
-    FULL(-4);
+    FULL(-4),
+    INVALID_HEADCOUNT(-5);;
 
     private final long code;
 
