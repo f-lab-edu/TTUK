@@ -5,6 +5,7 @@ import com.ttuk.global.error.ErrorCode;
 import com.ttuk.global.response.PageResponse;
 import com.ttuk.global.storage.S3ImageStorage;
 import com.ttuk.grouppurchase.dto.*;
+import com.ttuk.grouppurchase.redis.GroupPurchaseLiveDetail;
 import com.ttuk.grouppurchase.redis.GroupPurchaseLiveValue;
 import com.ttuk.grouppurchase.redis.GroupPurchaseRedisRepository;
 import lombok.RequiredArgsConstructor;
@@ -45,16 +46,16 @@ public class GroupPurchaseQueryService {
         List<GroupPurchaseSummaryResponse> content = new ArrayList<>(rows.size());
         for (GroupPurchaseListRow row : rows) {
             GroupPurchaseLiveValue live = liveValues.getOrDefault(row.groupPurchaseId(), GroupPurchaseLiveValue.EMPTY);
-            int currentHeadcount = live.headcount() == null ? 0 : live.headcount();
-            int currentPrice = live.price() == null ? row.basePrice() : live.price();
             String thumbnailUrl = row.thumbnailKey() == null ? null : imageStorage.toUrl(row.thumbnailKey());
-            content.add(GroupPurchaseSummaryResponse.of(row, currentHeadcount, currentPrice, thumbnailUrl));
+            content.add(GroupPurchaseSummaryResponse.of(
+                    row, live.headcountOrZero(), live.priceOr(row.basePrice()), thumbnailUrl));
         }
 
         return PageResponse.of(content, request.page(), request.size(), totalElements);
     }
 
-    public GroupPurchaseDetailResponse findDetail(Long groupPurchaseId) {
+    public GroupPurchaseDetailResponse findDetail(Long groupPurchaseId, Long memberId) {
+        LocalDateTime now = LocalDateTime.now(clock);
         Optional<GroupPurchaseDetailRow> found = queryRepository.findDetail(groupPurchaseId);
         if (found.isEmpty()) {
             throw new BusinessException(ErrorCode.GROUP_PURCHASE_NOT_FOUND);
@@ -65,7 +66,18 @@ public class GroupPurchaseQueryService {
             imageUrls.add(imageStorage.toUrl(imageKey));
         }
 
-        return GroupPurchaseDetailResponse.of(row, imageUrls);
+        GroupPurchaseLiveDetail live = findLiveDetail(groupPurchaseId, memberId);
+        GroupPurchaseStatus status = displayStatus(live.statusOr(row.status()), row.closeAt(), now);
+
+        return GroupPurchaseDetailResponse.of(
+                row, imageUrls, live.headcountOrZero(), live.priceOr(row.basePrice()), status, live.joined());
+    }
+
+    private GroupPurchaseStatus displayStatus(GroupPurchaseStatus status, LocalDateTime closeAt, LocalDateTime now) {
+        if (status == GroupPurchaseStatus.OPEN && !now.isBefore(closeAt)) {
+            return GroupPurchaseStatus.CLOSED;
+        }
+        return status;
     }
 
     private Map<Long, GroupPurchaseLiveValue> findLiveValues(List<Long> ids) {
@@ -74,6 +86,16 @@ public class GroupPurchaseQueryService {
         } catch (DataAccessException e) {
             log.error("목록 Redis 조회 실패: 인원·단가를 DB 값으로 대신함. ids={}", ids, e);
             return Map.of();
+        }
+    }
+
+    private GroupPurchaseLiveDetail findLiveDetail(Long groupPurchaseId, Long memberId) {
+        try {
+            return redisRepository.findLiveDetail(groupPurchaseId, memberId);
+        } catch (DataAccessException e) {
+            log.error("상세 Redis 조회 실패: 인원·단가·상태를 DB 값으로 대신함. groupPurchaseId={}",
+                    groupPurchaseId, e);
+            return GroupPurchaseLiveDetail.EMPTY;
         }
     }
 }

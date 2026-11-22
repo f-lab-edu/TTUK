@@ -19,16 +19,24 @@ public record GroupPurchaseDetailResponse(
         DiscountType discountType,
         int discountValue,
         int discountStepSize,
+        int currentHeadcount,
+        int currentPrice,
         Integer maxHeadcount,
         LocalDateTime closeAt,
-        GroupPurchaseStatus status
+        GroupPurchaseStatus status,
+        boolean joined
 ) {
-    public static GroupPurchaseDetailResponse of(GroupPurchaseDetailRow row, List<String> imageUrls) {
+    public static GroupPurchaseDetailResponse of(GroupPurchaseDetailRow row, List<String> imageUrls,
+                                                 int currentHeadcount,
+                                                 int currentPrice,
+                                                 GroupPurchaseStatus status,
+                                                 boolean joined) {
         return new GroupPurchaseDetailResponse(
                 row.groupPurchaseId(), row.title(), row.description(), row.unit(),
                 row.categoryName(), row.sellerNickname(), imageUrls,
                 row.basePrice(), row.floorPrice(),
                 row.discountType(), row.discountValue(), row.discountStepSize(),
-                row.maxHeadcount(), row.closeAt(), row.status());
+                currentHeadcount, currentPrice,
+                row.maxHeadcount(), row.closeAt(), status, joined);
     }
 }
