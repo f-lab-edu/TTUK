@@ -30,6 +30,7 @@ public class ParticipationService {
             case JOINED -> saveParticipation(groupPurchaseId, memberId, quantity, result);
             case NOT_OPEN -> throw new BusinessException(ErrorCode.GROUP_PURCHASE_NOT_OPEN);
             case FULL -> throw new BusinessException(ErrorCode.GROUP_PURCHASE_FULL);
+            case INVALID_HEADCOUNT -> throw new IllegalStateException("Redis 참여 인원 값이 올바르지 않습니다. groupPurchaseId=" + groupPurchaseId);
             case ALREADY_JOINED -> throw new BusinessException(ErrorCode.ALREADY_JOINED);
             case NOT_INITIALIZED -> throw notInitialized(groupPurchaseId);
         };
