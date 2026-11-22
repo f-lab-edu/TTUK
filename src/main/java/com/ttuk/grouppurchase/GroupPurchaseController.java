@@ -5,10 +5,7 @@ import com.ttuk.global.auth.LoginMember;
 import com.ttuk.global.auth.RequireRole;
 import com.ttuk.global.response.ApiResponse;
 import com.ttuk.global.response.PageResponse;
-import com.ttuk.grouppurchase.dto.GroupPurchaseCreateRequest;
-import com.ttuk.grouppurchase.dto.GroupPurchaseCreateResponse;
-import com.ttuk.grouppurchase.dto.GroupPurchaseListRequest;
-import com.ttuk.grouppurchase.dto.GroupPurchaseSummaryResponse;
+import com.ttuk.grouppurchase.dto.*;
 import com.ttuk.member.MemberRole;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -45,6 +42,11 @@ public class GroupPurchaseController {
 
         PageResponse<GroupPurchaseSummaryResponse> response = groupPurchaseQueryService.findOpenList(request);
         return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    @GetMapping("/{groupPurchaseId}")
+    public ResponseEntity<ApiResponse<GroupPurchaseDetailResponse>> detail(@PathVariable Long groupPurchaseId){
+        return ResponseEntity.ok(ApiResponse.success(groupPurchaseQueryService.findDetail(groupPurchaseId)));
     }
 
 }
