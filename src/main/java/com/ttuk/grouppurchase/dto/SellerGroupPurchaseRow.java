@@ -16,5 +16,5 @@ public record  SellerGroupPurchaseRow(
         LocalDateTime closeAt,
         LocalDateTime createdAt
 
-) {
+) implements SellerFigureSource {
 }

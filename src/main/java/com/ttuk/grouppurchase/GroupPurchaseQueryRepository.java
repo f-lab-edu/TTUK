@@ -128,6 +128,38 @@ public class GroupPurchaseQueryRepository {
 
     }
 
+    public Optional<SellerGroupPurchaseDetailRow> findSellerDetail(Long id) {
+
+        SellerGroupPurchaseDetailRow row = queryFactory
+                .select(Projections.constructor(SellerGroupPurchaseDetailRow.class,
+                        groupPurchase.id,
+                        groupPurchase.seller.id,
+                        groupPurchase.title,
+                        category.name,
+                        groupPurchase.unit,
+                        groupPurchase.status,
+                        groupPurchase.basePrice,
+                        groupPurchase.floorPrice,
+                        groupPurchase.discountType,
+                        groupPurchase.discountValue,
+                        groupPurchase.discountStepSize,
+                        groupPurchase.maxHeadcount,
+                        groupPurchase.finalHeadcount,
+                        groupPurchase.finalPrice,
+                        groupPurchase.closeAt,
+                        groupPurchase.createdAt,
+                        groupPurchase.closedAt,
+                        groupPurchase.cancelReason,
+                        groupPurchase.canceledAt))
+                .from(groupPurchase)
+                .join(groupPurchase.category, category)
+                .where(groupPurchase.id.eq(id))
+                .fetchOne();
+
+        return Optional.ofNullable(row);
+
+    }
+
     private BooleanExpression displayStatusEq(GroupPurchaseStatus status, LocalDateTime now) {
 
         if(status == null){
