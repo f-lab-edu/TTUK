@@ -23,6 +23,7 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import java.time.Clock;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 
 import static org.hamcrest.Matchers.nullValue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -65,7 +66,7 @@ class SellerGroupPurchaseDetailIntegrationTest {
 
     @BeforeEach
     void setUp() {
-        closeAt = LocalDateTime.now(clock).minusDays(1).withSecond(30).withNano(0);
+        closeAt = LocalDateTime.now(clock).minusDays(1).withNano(0);
         seller = saveMember(SELLER_EMAIL, "판매자", MemberRole.SELLER, "01022223333");
         saveMember(OTHER_SELLER_EMAIL, "다른판매자", MemberRole.SELLER, "01044445555");
         buyerA = saveMember("buyer-a@ttuk.kr", "구매자에이", MemberRole.BUYER, "01011110001");
@@ -111,7 +112,7 @@ class SellerGroupPurchaseDetailIntegrationTest {
                 .andExpect(jsonPath("$.data.currentPrice").value(2700))
                 .andExpect(jsonPath("$.data.totalQuantity").value(5))
                 .andExpect(jsonPath("$.data.totalAmount").value(13500))
-                .andExpect(jsonPath("$.data.closeAt").value(closeAt.toString()))
+                .andExpect(jsonPath("$.data.closedAt").value(closedAt.format(DateTimeFormatter.ISO_LOCAL_DATE_TIME)))
                 .andExpect(jsonPath("$.data.closedAt").value(closedAt.toString()))
                 .andExpect(jsonPath("$.data.cancelReason").value(nullValue()))
                 .andExpect(jsonPath("$.data.canceledAt").value(nullValue()))
@@ -139,7 +140,7 @@ class SellerGroupPurchaseDetailIntegrationTest {
                 .andExpect(jsonPath("$.data.totalQuantity").value(nullValue()))
                 .andExpect(jsonPath("$.data.totalAmount").value(nullValue()))
                 .andExpect(jsonPath("$.data.cancelReason").value("재고 부족"))
-                .andExpect(jsonPath("$.data.canceledAt").value(canceledAt.toString()))
+                .andExpect(jsonPath("$.data.canceledAt").value(canceledAt.format(DateTimeFormatter.ISO_LOCAL_DATE_TIME)))
                 .andExpect(jsonPath("$.data.closedAt").value(nullValue()));
     }
 

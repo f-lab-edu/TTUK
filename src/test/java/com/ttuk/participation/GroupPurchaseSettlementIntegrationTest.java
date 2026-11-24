@@ -96,7 +96,7 @@ class GroupPurchaseSettlementIntegrationTest {
     }
 
     @Test
-    @DisplayName("대조: DB에만 JOINED인 참여는 CANCELED로 정리하고, Redis에만 있는 참여자는 최종 인원에 포함한다")
+    @DisplayName("대조: DB에만 JOINED인 참여는 CANCELED(취소 주체 SYSTEM)로 정리하고, Redis에만 있는 참여자는 최종 인원에 포함한다")
     void settle_reconcile() {
         Long id = openGroupPurchase();
         participationService.join(id, buyer1.getId(), 1);
@@ -111,6 +111,7 @@ class GroupPurchaseSettlementIntegrationTest {
         assertThat(row.get("final_headcount")).isEqualTo(1);
         assertThat(row.get("final_price")).isEqualTo(3000);
         assertThat(participationStatus(buyer1)).isEqualTo("CANCELED");
+        assertThat(participationCanceledBy(buyer1)).isEqualTo("SYSTEM");
     }
 
     @Test
@@ -155,6 +156,11 @@ class GroupPurchaseSettlementIntegrationTest {
     private String participationStatus(Member member) {
         return jdbcTemplate.queryForObject(
                 "SELECT status FROM participation WHERE member_id = ?", String.class, member.getId());
+    }
+
+    private String participationCanceledBy(Member member) {
+        return jdbcTemplate.queryForObject(
+                "SELECT canceled_by FROM participation WHERE member_id = ?", String.class, member.getId());
     }
 
     private Long openGroupPurchase() {

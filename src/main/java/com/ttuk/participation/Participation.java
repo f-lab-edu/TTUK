@@ -49,6 +49,11 @@ public class Participation extends BaseTimeEntity {
 
     private LocalDateTime canceledAt;
 
+    @Enumerated(EnumType.STRING)
+    @JdbcTypeCode(SqlTypes.VARCHAR)
+    @Column(length = 20)
+    private CanceledBy canceledBy;
+
     @Builder
     private Participation(GroupPurchase groupPurchase, Member member, int quantity, LocalDateTime joinedAt) {
         this.groupPurchase = groupPurchase;
