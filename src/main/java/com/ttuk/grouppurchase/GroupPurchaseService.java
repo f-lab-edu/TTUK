@@ -65,6 +65,7 @@ public class GroupPurchaseService {
             imageStorage.deleteAllQuietly(imageKeys);
             throw e;
         }
+
     }
 
     public GroupPurchaseCancelResponse cancel(Long sellerId, Long groupPurchaseId, GroupPurchaseCancelRequest request) {

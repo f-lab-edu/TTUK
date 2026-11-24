@@ -13,6 +13,8 @@ import java.util.List;
 import java.util.Optional;
 
 import static com.ttuk.category.QCategory.category;
+import static com.ttuk.grouppurchase.GroupPurchaseConditions.isDisplayedAs;
+import static com.ttuk.grouppurchase.GroupPurchaseConditions.isOpenAt;
 import static com.ttuk.grouppurchase.QGroupPurchase.groupPurchase;
 import static com.ttuk.grouppurchase.QGroupPurchaseImage.groupPurchaseImage;
 import static com.ttuk.member.QMember.member;
@@ -43,7 +45,7 @@ public class GroupPurchaseQueryRepository {
                 .leftJoin(groupPurchaseImage).on(
                         groupPurchaseImage.groupPurchase.eq(groupPurchase),
                         groupPurchaseImage.sortOrder.eq(THUMBNAIL_ORDER))
-                .where(openAt(now),
+                .where(isOpenAt(now),
                         categoryIdEq(request.categoryId()))
                 .orderBy(orderBy(request.sort()))
                 .offset((long) request.page() * request.size())
@@ -55,7 +57,7 @@ public class GroupPurchaseQueryRepository {
         Long count = queryFactory
                 .select(groupPurchase.count())
                 .from(groupPurchase)
-                .where(openAt(now),
+                .where(isOpenAt(now),
                         categoryIdEq(categoryId))
                 .fetchOne();
         return count == null ? 0 : count;
@@ -111,7 +113,7 @@ public class GroupPurchaseQueryRepository {
                         groupPurchase.createdAt))
                 .from(groupPurchase)
                 .where(groupPurchase.seller.id.eq(sellerId),
-                        displayStatusEq(request.status(), now))
+                        isDisplayedAs(request.status(), now))
                 .orderBy(groupPurchase.id.desc())
                 .offset((long) request.page() * request.size())
                 .limit(request.size())
@@ -122,7 +124,7 @@ public class GroupPurchaseQueryRepository {
 
         Long count = queryFactory.select(groupPurchase.count())
                 .from(groupPurchase)
-                .where(groupPurchase.seller.id.eq(sellerId), displayStatusEq(status, now))
+                .where(groupPurchase.seller.id.eq(sellerId), isDisplayedAs(status, now))
                 .fetchOne();
         return count == null ? 0 : count;
 
@@ -158,26 +160,6 @@ public class GroupPurchaseQueryRepository {
 
         return Optional.ofNullable(row);
 
-    }
-
-    private BooleanExpression displayStatusEq(GroupPurchaseStatus status, LocalDateTime now) {
-
-        if(status == null){
-            return null;
-        }
-        return switch (status){
-            case OPEN -> openAt(now);
-            case CLOSED -> groupPurchase.status.eq(GroupPurchaseStatus.CLOSED)
-                    .or(groupPurchase.status.eq(GroupPurchaseStatus.OPEN).and(groupPurchase.closeAt.loe(now)));
-            case CANCELED -> groupPurchase.status.eq(GroupPurchaseStatus.CANCELED);
-
-        };
-
-    }
-
-    private BooleanExpression openAt(LocalDateTime now) {
-        return groupPurchase.status.eq(GroupPurchaseStatus.OPEN)
-                .and(groupPurchase.closeAt.gt(now));
     }
 
     private BooleanExpression categoryIdEq(Long categoryId) {
