@@ -19,18 +19,17 @@ public record SellerGroupPurchaseResponse(
 
 ) {
 
-    public static SellerGroupPurchaseResponse of(SellerGroupPurchaseRow row, GroupPurchaseStatus status, int currentHeadcount, int currentPrice,
-                                                 Long totalQuantity, Long totalAmount) {
+    public static SellerGroupPurchaseResponse of(SellerGroupPurchaseRow row, SellerFigures figures) {
 
         return new SellerGroupPurchaseResponse(
                 row.groupPurchaseId(),
                 row.title(),
-                status,
-                currentHeadcount,
+                figures.status(),
+                figures.currentHeadcount(),
                 row.maxHeadcount(),
-                currentPrice,
-                totalQuantity,
-                totalAmount,
+                figures.currentPrice(),
+                figures.totalQuantity(),
+                figures.totalAmount(),
                 row.closeAt(),
                 row.createdAt());
 

@@ -93,24 +93,11 @@ public class GroupPurchaseQueryService {
         List<SellerGroupPurchaseRow> rows = queryRepository.findSellerList(sellerId, request, now);
         long totalElements = queryRepository.countSellerList(sellerId, request.status(), now);
 
-        List<Long> openIds = new ArrayList<>();
-        List<Long> soldIds = new ArrayList<>();
-
-        for (SellerGroupPurchaseRow row : rows) {
-            if (row.status() == GroupPurchaseStatus.CANCELED) {
-                continue;
-            }
-            soldIds.add(row.groupPurchaseId());
-            if (row.status() == GroupPurchaseStatus.OPEN) {
-                openIds.add(row.groupPurchaseId());
-            }
-        }
-        Map<Long, GroupPurchaseLiveValue> liveValues = openIds.isEmpty() ? Map.of() : findLiveValues(openIds);
-        Map<Long, Long> quantities = findJoinedQuantities(soldIds);
+        Map<Long, SellerFigures> figures = findSellerFigures(rows, now);
 
         List<SellerGroupPurchaseResponse> content = new ArrayList<>(rows.size());
         for (SellerGroupPurchaseRow row : rows) {
-            content.add(toSellerResponse(row, liveValues, quantities, now));
+            content.add(SellerGroupPurchaseResponse.of(row, figures.get(row.groupPurchaseId())));
         }
 
         return PageResponse.of(content, request.page(), request.size(), totalElements);
@@ -152,29 +139,48 @@ public class GroupPurchaseQueryService {
         }
     }
 
-    private SellerGroupPurchaseResponse toSellerResponse(SellerGroupPurchaseRow row,
-                                                         Map<Long, GroupPurchaseLiveValue> liveValues,
-                                                         Map<Long, Long> quantities,
-                                                         LocalDateTime now) {
+    private Map<Long, SellerFigures> findSellerFigures(List<? extends SellerFigureSource> sources, LocalDateTime now) {
 
-        GroupPurchaseStatus status = displayStatus(row.status(), row.closeAt(), now);
-        if(row.status() == GroupPurchaseStatus.CANCELED) {
-            return SellerGroupPurchaseResponse.of(
-                    row, status, row.finalHeadcount(), row.finalPrice(), null, null);
+        List<Long> openIds = new ArrayList<>();
+        List<Long> soldIds = new ArrayList<>();
+
+        for(SellerFigureSource source : sources) {
+            if(source.status() == GroupPurchaseStatus.CANCELED){
+                continue;
+            }
+            soldIds.add(source.groupPurchaseId());
+            if(source.status() == GroupPurchaseStatus.OPEN) {
+                openIds.add(source.groupPurchaseId());
+            }
         }
 
-        Long totalQuantity = quantities.getOrDefault(row.groupPurchaseId(), 0L);
-        if(row.status() == GroupPurchaseStatus.CLOSED) {
+        Map<Long, GroupPurchaseLiveValue> liveValues = openIds.isEmpty() ? Map.of() : findLiveValues(openIds);
+        Map<Long, Long> quantities = findJoinedQuantities(soldIds);
 
-            long totalAmount = totalQuantity * row.finalPrice();
-            return SellerGroupPurchaseResponse.of(
-                    row, status, row.finalHeadcount(), row.finalPrice(), totalQuantity, totalAmount);
-
+        Map<Long, SellerFigures> figures = new HashMap<>();
+        for(SellerFigureSource source : sources) {
+            figures.put(source.groupPurchaseId(), toFigures(source, liveValues, quantities, now));
         }
 
-        GroupPurchaseLiveValue live = liveValues.getOrDefault(row.groupPurchaseId(), GroupPurchaseLiveValue.EMPTY);
-        return SellerGroupPurchaseResponse.of(
-                row, status, live.headcountOrZero(), live.priceOr(row.basePrice()), totalQuantity, null);
+        return figures;
+    }
+
+    private SellerFigures toFigures(SellerFigureSource source, Map<Long, GroupPurchaseLiveValue> liveValues,
+                                    Map<Long, Long> quantities, LocalDateTime now) {
+
+        GroupPurchaseStatus status = displayStatus(source.status(), source.closeAt(), now);
+        if(source.status() == GroupPurchaseStatus.CANCELED){
+            return new SellerFigures(status, source.finalHeadcount(), source.finalPrice(), null, null);
+        }
+
+        Long totalQuantity = quantities.getOrDefault(source.groupPurchaseId(), 0L);
+        if(source.status() == GroupPurchaseStatus.CLOSED){
+            long totalAmount = totalQuantity * source.finalPrice();
+            return new SellerFigures(status, source.finalHeadcount(), source.finalPrice(), totalQuantity, totalAmount);
+        }
+
+        GroupPurchaseLiveValue live = liveValues.getOrDefault(source.groupPurchaseId(), GroupPurchaseLiveValue.EMPTY);
+        return new SellerFigures(status, live.headcountOrZero(), live.priceOr(source.basePrice()), totalQuantity, null);
 
     }
 
