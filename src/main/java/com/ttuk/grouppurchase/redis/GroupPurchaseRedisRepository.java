@@ -40,6 +40,10 @@ public class GroupPurchaseRedisRepository {
     private static final RedisScript<Long> ROLLBACK_JOIN_SCRIPT =
             RedisScript.of(new ClassPathResource("redis/rollback_join_group_purchase.lua"), Long.class);
 
+    @SuppressWarnings("rawtypes")
+    private static final RedisScript<List> CANCEL_SCRIPT =
+            RedisScript.of(new ClassPathResource("redis/cancel_join_group_purchase.lua"), List.class);
+
 
     public boolean initialize(GroupPurchaseCreatedEvent event) {
         return createKeys(event, Set.of());
@@ -135,30 +139,38 @@ public class GroupPurchaseRedisRepository {
     }
 
     public JoinResult join(Long groupPurchaseId, Long memberId) {
-        List<String> keys = List.of(
-                GroupPurchaseRedisKeys.meta(groupPurchaseId),
-                GroupPurchaseRedisKeys.headcount(groupPurchaseId),
-                GroupPurchaseRedisKeys.price(groupPurchaseId),
-                GroupPurchaseRedisKeys.status(groupPurchaseId),
-                GroupPurchaseRedisKeys.participants(groupPurchaseId)
-        );
-
         @SuppressWarnings("unchecked")
-        List<Long> result = redisTemplate.execute(JOIN_SCRIPT, keys, String.valueOf(memberId));
-
+        List<Long> result = redisTemplate.execute(JOIN_SCRIPT, participationKeys(groupPurchaseId),
+                String.valueOf(memberId));
         return JoinResult.from(result);
     }
 
     public boolean rollbackJoin(Long groupPurchaseId, Long memberId) {
-        List<String> keys = List.of(
+        Long result = redisTemplate.execute(ROLLBACK_JOIN_SCRIPT, participationKeys(groupPurchaseId),
+                String.valueOf(memberId));
+        return Long.valueOf(1L).equals(result);
+    }
+
+    public CancelResult cancel(Long groupPurchaseId, Long memberId, LocalDateTime now, Duration cancelableBefore) {
+
+        @SuppressWarnings("unchecked")
+        List<Long> result  = redisTemplate.execute(CANCEL_SCRIPT, participationKeys(groupPurchaseId),
+                String.valueOf(memberId),
+                String.valueOf(toEpochSecond(now)),
+                String.valueOf(cancelableBefore.toSeconds()));
+        return CancelResult.from(result);
+
+    }
+
+    private List<String> participationKeys(Long groupPurchaseId) {
+
+        return List.of(
                 GroupPurchaseRedisKeys.meta(groupPurchaseId),
                 GroupPurchaseRedisKeys.headcount(groupPurchaseId),
                 GroupPurchaseRedisKeys.price(groupPurchaseId),
                 GroupPurchaseRedisKeys.status(groupPurchaseId),
                 GroupPurchaseRedisKeys.participants(groupPurchaseId));
 
-        Long result = redisTemplate.execute(ROLLBACK_JOIN_SCRIPT, keys, String.valueOf(memberId));
-        return Long.valueOf(1L).equals(result);
     }
 
     private long toEpochSecond(LocalDateTime dateTime) {
