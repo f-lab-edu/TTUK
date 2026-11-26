@@ -104,6 +104,23 @@ public class GroupPurchaseQueryService {
 
     }
 
+    public SellerGroupPurchaseDetailResponse findSellerDetail(Long groupPurchaseId, Long sellerId) {
+
+        LocalDateTime now = LocalDateTime.now(clock);
+        Optional<SellerGroupPurchaseDetailRow> found = queryRepository.findSellerDetail(groupPurchaseId);
+        if(found.isEmpty()) {
+            throw new BusinessException(ErrorCode.GROUP_PURCHASE_NOT_FOUND);
+        }
+        SellerGroupPurchaseDetailRow row = found.get();
+        if(!row.isSoldBy(sellerId)) {
+            throw new BusinessException(ErrorCode.NOT_GROUP_PURCHASE_OWNER);
+        }
+
+        SellerFigures figures = findSellerFigures(List.of(row), now).get(row.groupPurchaseId());
+        return SellerGroupPurchaseDetailResponse.of(row, figures);
+
+    }
+
     private Optional<NextDiscount> findNextDiscount(GroupPurchaseDetailRow row,
                                                     int currentHeadcount,
                                                     GroupPurchaseStatus status) {
