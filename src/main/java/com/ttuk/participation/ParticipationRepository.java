@@ -19,6 +19,7 @@ public interface  ParticipationRepository extends JpaRepository<Participation, L
     @Query("""
             update Participation p
                set p.status = com.ttuk.participation.ParticipationStatus.CANCELED,
+                   p.canceledBy = com.ttuk.participation.CanceledBy.BUYER,
                    p.canceledAt = :now,
                    p.updatedAt = :now
              where p.groupPurchase.id = :groupPurchaseId
@@ -60,6 +61,7 @@ public interface  ParticipationRepository extends JpaRepository<Participation, L
     @Query("""
             update Participation p
                set p.status = com.ttuk.participation.ParticipationStatus.CANCELED,
+                   p.canceledBy = com.ttuk.participation.CanceledBy.SYSTEM,
                    p.canceledAt = :now,
                    p.updatedAt = :now
              where p.groupPurchase.id = :groupPurchaseId

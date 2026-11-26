@@ -93,7 +93,7 @@ class ParticipationCancelIntegrationTest {
     }
 
     @Test
-    @DisplayName("참여를 취소하면 204이고, DB 참여는 CANCELED·취소 시각이 기록되며 Redis 인원이 줄어든다")
+    @DisplayName("참여를 취소하면 204이고, DB 참여는 CANCELED·취소 시각·취소 주체 BUYER가 기록되며 Redis 인원이 줄어든다")
     void cancel() throws Exception {
         Long id = openGroupPurchase();
         participationService.join(id, buyer.getId(), 2);
@@ -102,19 +102,22 @@ class ParticipationCancelIntegrationTest {
         Map<String, Object> row = participationRow();
         assertThat(row.get("status")).isEqualTo("CANCELED");
         assertThat(row.get("canceled_at")).isNotNull();
+        assertThat(row.get("canceled_by")).isEqualTo("BUYER");
         assertThat(redisTemplate.opsForValue().get(GroupPurchaseRedisKeys.headcount(id))).isEqualTo("0");
 
     }
 
     @Test
-    @DisplayName("Redis에서는 이미 취소됐는데 DB가 JOINED로 남아 있으면, 다시 요청할 때 DB를 마무리하고 204다")
+    @DisplayName("Redis에서는 이미 취소됐는데 DB가 JOINED로 남아 있으면, 다시 요청할 때 DB를 마무리하고 204다 (취소 주체 BUYER)")
     void cancel_finishPendingCancel() throws Exception {
 
         Long id = openGroupPurchase();
         participationService.join(id, buyer.getId(), 2);
         groupPurchaseRedisRepository.cancel(id, buyer.getId(), LocalDateTime.now(clock), GroupPurchase.CANCELABLE_BEFORE_CLOSE);
         cancel(id, buyerCookie).andExpect(status().isNoContent());
-        assertThat(participationRow().get("status")).isEqualTo("CANCELED");
+        Map<String, Object> row = participationRow();
+        assertThat(row.get("status")).isEqualTo("CANCELED");
+        assertThat(row.get("canceled_by")).isEqualTo("BUYER");
 
     }
 
@@ -162,7 +165,7 @@ class ParticipationCancelIntegrationTest {
     }
 
     private Map<String, Object> participationRow() {
-        return jdbcTemplate.queryForMap("SELECT status, canceled_at FROM participation");
+        return jdbcTemplate.queryForMap("SELECT status, canceled_at, canceled_by FROM participation");
     }
 
     private Long openGroupPurchase() {

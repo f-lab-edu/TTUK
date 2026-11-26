@@ -22,6 +22,7 @@ import static org.hamcrest.Matchers.nullValue;
 
 import java.time.Clock;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 
 import static org.hamcrest.Matchers.endsWith;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -103,7 +104,7 @@ public class GroupPurchaseDetailIntegrationTest {
                 .andExpect(jsonPath("$.data.discountValue").value(5))
                 .andExpect(jsonPath("$.data.discountStepSize").value(10))
                 .andExpect(jsonPath("$.data.maxHeadcount").value(50))
-                .andExpect(jsonPath("$.data.closeAt").value(closeAt.toString()))
+                .andExpect(jsonPath("$.data.closeAt").value(closeAt.format(DateTimeFormatter.ISO_LOCAL_DATE_TIME)))
                 .andExpect(jsonPath("$.data.status").value("OPEN"))
                 .andExpect(jsonPath("$.data.imageUrls.length()").value(3))
                 .andExpect(jsonPath("$.data.imageUrls[0]").value(endsWith("daepa-1.png")))

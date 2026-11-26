@@ -1,6 +1,7 @@
 package com.ttuk.participation.dto;
 
 import com.ttuk.grouppurchase.GroupPurchaseStatus;
+import com.ttuk.participation.CanceledBy;
 import com.ttuk.participation.ParticipationStatus;
 
 import java.time.LocalDateTime;
@@ -15,6 +16,7 @@ public record MyParticipationRow(
         int quantity,
         LocalDateTime joinedAt,
         LocalDateTime participationCanceledAt,
+        CanceledBy participationCanceledBy,
         GroupPurchaseStatus groupPurchaseStatus,
         int basePrice,
         LocalDateTime closeAt,
@@ -23,7 +25,4 @@ public record MyParticipationRow(
         LocalDateTime groupPurchaseCanceledAt
 
 ) {
-
-
-
 }

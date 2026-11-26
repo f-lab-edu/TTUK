@@ -32,6 +32,7 @@ public class ParticipationQueryRepository {
                 participation.quantity,
                 participation.joinedAt,
                 participation.canceledAt,
+                participation.canceledBy,
                 groupPurchase.status,
                 groupPurchase.basePrice,
                 groupPurchase.closeAt,
