@@ -1,15 +1,20 @@
 -- KEYS[1] meta, KEYS[2] headcount, KEYS[3] price, KEYS[4] status, KEYS[5] participants
 -- ARGV[1] memberId
--- 반환: 1 되돌림 / 0 되돌릴 것 없음
+-- 반환: 1 되돌림 / 0 되돌릴 것 없음 / 2 되돌릴 참여가 있지만 이미 정산돼 바꾸지 않음
 
 if redis.call('EXISTS', KEYS[1]) == 0 then
 	return 0
 end
 
-if redis.call('SREM', KEYS[5], ARGV[1]) == 0 then
+if redis.call('SISMEMBER', KEYS[5], ARGV[1]) == 0 then
 	return 0
 end
 
+if redis.call('HEXISTS', KEYS[1], 'settled') == 1 then
+	return 2
+end
+
+redis.call('SREM', KEYS[5], ARGV[1])
 local newHeadcount = redis.call('DECR', KEYS[2])
 
 local meta = redis.call('HMGET', KEYS[1],

@@ -2,20 +2,22 @@ package com.ttuk.grouppurchase.redis;
 
 public enum GroupPurchaseCancelOutcome {
 
-    CANCELED(1),
-    ALREADY_CANCELED(2),
-    NOT_INITIALIZED(-1),
-    NOT_OPEN(-2),
-    INVALID_STATE(-3);
+    CANCELED(1, true),
+    ALREADY_CANCELED(2, true),
+    NOT_INITIALIZED(-1, false),
+    NOT_OPEN(-2, false),
+    INVALID_STATE(-3, false);
 
     private final long code;
+    private final boolean carriesValues;
 
-    GroupPurchaseCancelOutcome(long code) {
+    GroupPurchaseCancelOutcome(long code, boolean carriesValues) {
         this.code = code;
+        this.carriesValues = carriesValues;
     }
 
     public boolean carriesValues(){
-        return code > 0;
+        return carriesValues;
     }
 
     public static GroupPurchaseCancelOutcome from(long code){

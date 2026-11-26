@@ -14,7 +14,7 @@ import java.util.List;
 public interface GroupPurchaseRepository extends JpaRepository<GroupPurchase, Long> {
 
     @Transactional(propagation = Propagation.MANDATORY)
-    @Modifying
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("""
              update GroupPurchase g
                            set g.status = com.ttuk.grouppurchase.GroupPurchaseStatus.CLOSED,
@@ -36,9 +36,45 @@ public interface GroupPurchaseRepository extends JpaRepository<GroupPurchase, Lo
               from GroupPurchase g
              where g.status = com.ttuk.grouppurchase.GroupPurchaseStatus.OPEN
                and g.closeAt <= :threshold
+               and g.settleFailCount < :maxFailures
+               and (g.nextSettleAt is null or g.nextSettleAt <= :now)
              order by g.closeAt
             """)
-    List<Long> findSettlementTargetIds(@Param("threshold") LocalDateTime threshold, Limit limit);
+    List<Long> findSettlementTargetIds(@Param("threshold") LocalDateTime threshold,
+                                       @Param("maxFailures") int maxFailures,
+                                       @Param("now") LocalDateTime now,
+                                       Limit limit);
+
+    @Query("""
+            select g.id
+              from GroupPurchase g
+              join Participation p on p.groupPurchase = g
+             where g.status = com.ttuk.grouppurchase.GroupPurchaseStatus.OPEN
+               and g.maxHeadcount is not null
+               and p.status = com.ttuk.participation.ParticipationStatus.JOINED
+               and g.settleFailCount < :maxFailures
+               and (g.nextSettleAt is null or g.nextSettleAt <= :now)
+             group by g.id, g.maxHeadcount
+            having count(p) >= g.maxHeadcount
+             order by g.id
+            """)
+    List<Long> findFilledSettlementTargetIds(@Param("maxFailures") int maxFailures,
+                                             @Param("now") LocalDateTime now,
+                                             Limit limit);
+
+    @Transactional
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("""
+            update GroupPurchase g
+               set g.settleFailCount = g.settleFailCount + 1,
+                   g.nextSettleAt = :nextSettleAt,
+                   g.updatedAt = :now
+             where g.id = :groupPurchaseId
+               and g.status = com.ttuk.grouppurchase.GroupPurchaseStatus.OPEN
+            """)
+    int recordSettleFailure(@Param("groupPurchaseId") Long groupPurchaseId,
+                            @Param("nextSettleAt") LocalDateTime nextSettleAt,
+                            @Param("now") LocalDateTime now);
 
     @Transactional
     @Modifying
