@@ -6,13 +6,11 @@ import com.ttuk.global.response.PageResponse;
 import com.ttuk.global.storage.S3ImageStorage;
 import com.ttuk.grouppurchase.dto.*;
 import com.ttuk.grouppurchase.redis.GroupPurchaseLiveDetail;
+import com.ttuk.grouppurchase.redis.GroupPurchaseLiveReader;
 import com.ttuk.grouppurchase.redis.GroupPurchaseLiveValue;
-import com.ttuk.grouppurchase.redis.GroupPurchaseRedisRepository;
 import com.ttuk.participation.ParticipationRepository;
 import com.ttuk.participation.dto.JoinedQuantity;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.dao.DataAccessException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -24,14 +22,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
-@Slf4j
 @Service
 @Transactional(readOnly = true)
 @RequiredArgsConstructor
 public class GroupPurchaseQueryService {
 
     private final GroupPurchaseQueryRepository queryRepository;
-    private final GroupPurchaseRedisRepository redisRepository;
+    private final GroupPurchaseLiveReader liveReader;
     private final S3ImageStorage imageStorage;
     private final Clock clock;
     private final ParticipationRepository participationRepository;
@@ -45,7 +42,7 @@ public class GroupPurchaseQueryService {
         for (GroupPurchaseListRow row : rows) {
             ids.add(row.groupPurchaseId());
         }
-        Map<Long, GroupPurchaseLiveValue> liveValues = findLiveValues(ids);
+        Map<Long, GroupPurchaseLiveValue> liveValues = liveReader.findLiveValues(ids);
 
         List<GroupPurchaseSummaryResponse> content = new ArrayList<>(rows.size());
         for (GroupPurchaseListRow row : rows) {
@@ -70,9 +67,9 @@ public class GroupPurchaseQueryService {
             imageUrls.add(imageStorage.toUrl(imageKey));
         }
 
-        GroupPurchaseLiveDetail live = findLiveDetail(groupPurchaseId, memberId);
+        GroupPurchaseLiveDetail live = liveReader.findLiveDetail(groupPurchaseId, memberId);
         int currentHeadcount = live.headcountOrZero();
-        GroupPurchaseStatus status = displayStatus(live.statusOr(row.status()), row.closeAt(), now);
+        GroupPurchaseStatus status = live.statusOr(row.status()).displayedAt(row.closeAt(), now);
 
         Optional<NextDiscount> next = findNextDiscount(row, currentHeadcount, status);
         Integer nextDiscountIn = null;
@@ -130,32 +127,6 @@ public class GroupPurchaseQueryService {
         return row.discountPolicy().nextDiscount(currentHeadcount, row.maxHeadcount());
     }
 
-    private GroupPurchaseStatus displayStatus(GroupPurchaseStatus status, LocalDateTime closeAt, LocalDateTime now) {
-        if (status == GroupPurchaseStatus.OPEN && !now.isBefore(closeAt)) {
-            return GroupPurchaseStatus.CLOSED;
-        }
-        return status;
-    }
-
-    private Map<Long, GroupPurchaseLiveValue> findLiveValues(List<Long> ids) {
-        try {
-            return redisRepository.findLiveValues(ids);
-        } catch (DataAccessException e) {
-            log.error("목록 Redis 조회 실패: 인원·단가를 DB 값으로 대신함. ids={}", ids, e);
-            return Map.of();
-        }
-    }
-
-    private GroupPurchaseLiveDetail findLiveDetail(Long groupPurchaseId, Long memberId) {
-        try {
-            return redisRepository.findLiveDetail(groupPurchaseId, memberId);
-        } catch (DataAccessException e) {
-            log.error("상세 Redis 조회 실패: 인원·단가·상태를 DB 값으로 대신함. groupPurchaseId={}",
-                    groupPurchaseId, e);
-            return GroupPurchaseLiveDetail.EMPTY;
-        }
-    }
-
     private Map<Long, SellerFigures> findSellerFigures(List<? extends SellerFigureSource> sources, LocalDateTime now) {
 
         List<Long> openIds = new ArrayList<>();
@@ -171,7 +142,7 @@ public class GroupPurchaseQueryService {
             }
         }
 
-        Map<Long, GroupPurchaseLiveValue> liveValues = openIds.isEmpty() ? Map.of() : findLiveValues(openIds);
+        Map<Long, GroupPurchaseLiveValue> liveValues = liveReader.findLiveValues(openIds);
         Map<Long, Long> quantities = findJoinedQuantities(soldIds);
 
         Map<Long, SellerFigures> figures = new HashMap<>();
@@ -185,7 +156,7 @@ public class GroupPurchaseQueryService {
     private SellerFigures toFigures(SellerFigureSource source, Map<Long, GroupPurchaseLiveValue> liveValues,
                                     Map<Long, Long> quantities, LocalDateTime now) {
 
-        GroupPurchaseStatus status = displayStatus(source.status(), source.closeAt(), now);
+        GroupPurchaseStatus status = source.status().displayedAt(source.closeAt(), now);
         if(source.status() == GroupPurchaseStatus.CANCELED){
             return new SellerFigures(status, source.finalHeadcount(), source.finalPrice(), null, null);
         }

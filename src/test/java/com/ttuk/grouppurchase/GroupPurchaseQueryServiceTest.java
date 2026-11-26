@@ -4,6 +4,7 @@ import com.ttuk.global.config.ClockConfig;
 import com.ttuk.global.response.PageResponse;
 import com.ttuk.global.storage.S3ImageStorage;
 import com.ttuk.grouppurchase.dto.*;
+import com.ttuk.grouppurchase.redis.GroupPurchaseLiveReader;
 import com.ttuk.grouppurchase.redis.GroupPurchaseRedisRepository;
 import com.ttuk.participation.ParticipationRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -42,7 +43,7 @@ class GroupPurchaseQueryServiceTest {
     void setUp() {
         Clock clock = Clock.fixed(NOW.atZone(ClockConfig.SERVICE_ZONE).toInstant(), ClockConfig.SERVICE_ZONE);
         queryService = new GroupPurchaseQueryService(
-                queryRepository, redisRepository, imageStorage, clock, participationRepository);
+                queryRepository, new GroupPurchaseLiveReader(redisRepository), imageStorage, clock, participationRepository);
     }
 
     @Test
