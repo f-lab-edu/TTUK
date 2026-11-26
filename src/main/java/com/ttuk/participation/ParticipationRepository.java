@@ -12,7 +12,7 @@ import java.util.List;
 public interface  ParticipationRepository extends JpaRepository<Participation, Long> {
 
     @Transactional
-    @Modifying
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("""
             update Participation p
                set p.status = com.ttuk.participation.ParticipationStatus.CANCELED,

@@ -6,6 +6,7 @@ import com.ttuk.grouppurchase.GroupPurchase;
 import com.ttuk.grouppurchase.GroupPurchaseRepository;
 import com.ttuk.grouppurchase.GroupPurchaseStatus;
 import com.ttuk.grouppurchase.event.GroupPurchaseCreatedEvent;
+import com.ttuk.grouppurchase.redis.CancelOutcome;
 import com.ttuk.grouppurchase.redis.CancelResult;
 import com.ttuk.grouppurchase.redis.GroupPurchaseRedisRepository;
 import com.ttuk.grouppurchase.redis.JoinOutcome;
@@ -53,20 +54,30 @@ public class ParticipationService {
         LocalDateTime now = LocalDateTime.now(clock);
         CancelResult result = groupPurchaseRedisRepository.cancel(
                 groupPurchaseId, memberId, now, GroupPurchase.CANCELABLE_BEFORE_CLOSE);
+        if (result.outcome() == CancelOutcome.NOT_INITIALIZED) {
+            result = initializeAndRetryCancel(groupPurchaseId, memberId, now);
+        }
 
         switch (result.outcome()) {
             case CANCELED -> cancelJoinedParticipation(groupPurchaseId, memberId, now);
             case NOT_JOINED -> finishPendingCancel(groupPurchaseId, memberId, now);
-            case NOT_INITIALIZED -> cancelWithoutRedis(groupPurchaseId, memberId, now);
             case NOT_OPEN -> throw new BusinessException(ErrorCode.GROUP_PURCHASE_NOT_OPEN);
             case DEADLINE_PASSED -> throw new BusinessException(ErrorCode.CANCEL_DEADLINE_PASSED);
             case INVALID_HEADCOUNT -> throw new IllegalStateException("Redis 참여 인원 값이 올바르지 않습니다. groupPurchaseId=" + groupPurchaseId);
+            case NOT_INITIALIZED -> throw new IllegalStateException(
+                    "초기화 후에도 Redis 키가 없습니다. groupPurchaseId=" + groupPurchaseId);
         }
     }
 
+    // 참여 Lua는 통과했지만 참여 DB 저장이 끝나기 전에 취소가 들어오면,
+    // 취소 UPDATE는 아직 JOINED 행이 없어 0행이 되고, 그 뒤 저장이 끝나 DB에 JOINED가 남는다.
+    // Redis에서는 이미 빠졌으므로 취소를 다시 요청하면 NOT_JOINED 경로에서 DB가 마무리되고,
+    // 다시 요청하지 않아도 정산 때 Redis 참여자와 DB JOINED를 대조해 정리된다.
     private void cancelJoinedParticipation(Long groupPurchaseId, Long memberId, LocalDateTime now) {
         if (participationRepository.cancelJoined(groupPurchaseId, memberId, now) == 0) {
-            log.warn("참여 취소: Redis에서는 취소됐지만 DB에 JOINED 참여가 없음. groupPurchaseId={}, memberId={}", groupPurchaseId, memberId);
+            log.warn("참여 취소: Redis에서는 취소됐지만 DB에 JOINED 참여가 없음. "
+                    + "참여 저장이 끝나기 전에 취소가 들어온 경우일 수 있으며, 재요청이나 정산 대조로 정리됨. "
+                    + "groupPurchaseId={}, memberId={}", groupPurchaseId, memberId);
         }
     }
 
@@ -77,19 +88,20 @@ public class ParticipationService {
         log.info("참여 취소: Redis에서 이미 빠진 참여의 DB 기록을 마무리함. groupPurchaseId={}, memberId={}", groupPurchaseId, memberId);
     }
 
-    private void cancelWithoutRedis(Long groupPurchaseId, Long memberId, LocalDateTime now) {
-        Optional<GroupPurchase> found = groupPurchaseRepository.findById(groupPurchaseId);
-        if (found.isEmpty()) {
-            throw new BusinessException(ErrorCode.GROUP_PURCHASE_NOT_FOUND);
-        }
-        GroupPurchase groupPurchase = found.get();
+    private CancelResult initializeAndRetryCancel(Long groupPurchaseId, Long memberId, LocalDateTime now) {
+        GroupPurchase groupPurchase = groupPurchaseRepository.findById(groupPurchaseId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.GROUP_PURCHASE_NOT_FOUND));
         if (groupPurchase.getStatus() != GroupPurchaseStatus.OPEN) {
             throw new BusinessException(ErrorCode.GROUP_PURCHASE_NOT_OPEN);
         }
         if (!now.isBefore(groupPurchase.cancelDeadline())) {
             throw new BusinessException(ErrorCode.CANCEL_DEADLINE_PASSED);
         }
-        finishPendingCancel(groupPurchaseId, memberId, now);
+
+        List<Long> joinedMemberIds = participationRepository.findJoinedMemberIds(groupPurchaseId);
+        groupPurchaseRedisRepository.restore(GroupPurchaseCreatedEvent.from(groupPurchase), joinedMemberIds);
+        return groupPurchaseRedisRepository.cancel(
+                groupPurchaseId, memberId, now, GroupPurchase.CANCELABLE_BEFORE_CLOSE);
     }
 
     private JoinResult initializeAndRetry(Long groupPurchaseId, Long memberId) {
