@@ -5,6 +5,7 @@ import com.ttuk.global.response.PageResponse;
 import com.ttuk.global.storage.S3ImageStorage;
 import com.ttuk.grouppurchase.dto.*;
 import com.ttuk.grouppurchase.redis.GroupPurchaseRedisRepository;
+import com.ttuk.participation.ParticipationRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -32,13 +33,16 @@ class GroupPurchaseQueryServiceTest {
     GroupPurchaseRedisRepository redisRepository;
     @Mock
     S3ImageStorage imageStorage;
+    @Mock
+    ParticipationRepository participationRepository;
 
     GroupPurchaseQueryService queryService;
 
     @BeforeEach
     void setUp() {
         Clock clock = Clock.fixed(NOW.atZone(ClockConfig.SERVICE_ZONE).toInstant(), ClockConfig.SERVICE_ZONE);
-        queryService = new GroupPurchaseQueryService(queryRepository, redisRepository, imageStorage, clock);
+        queryService = new GroupPurchaseQueryService(
+                queryRepository, redisRepository, imageStorage, clock, participationRepository);
     }
 
     @Test
