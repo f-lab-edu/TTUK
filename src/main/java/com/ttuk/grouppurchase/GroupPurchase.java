@@ -11,6 +11,7 @@ import lombok.NoArgsConstructor;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
+import java.time.Duration;
 import java.time.LocalDateTime;
 
 @Entity
@@ -21,6 +22,8 @@ import java.time.LocalDateTime;
         @Index(name = "idx_group_purchase_status_close", columnList = "status, close_at")
 })
 public class GroupPurchase extends BaseTimeEntity {
+
+    public static final Duration CANCELABLE_BEFORE_CLOSE = Duration.ofHours(1);
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -103,5 +106,9 @@ public class GroupPurchase extends BaseTimeEntity {
 
     public boolean isJoinableAt(LocalDateTime now){
         return status == GroupPurchaseStatus.OPEN && now.isBefore(closeAt);
+    }
+
+    public LocalDateTime cancelDeadline(){
+        return closeAt.minus(CANCELABLE_BEFORE_CLOSE);
     }
 }

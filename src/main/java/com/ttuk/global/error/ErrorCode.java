@@ -38,6 +38,9 @@ public enum ErrorCode {
     GROUP_PURCHASE_FULL(HttpStatus.CONFLICT, "정원이 마감된 공동구매입니다."),
     ALREADY_JOINED(HttpStatus.CONFLICT, "이미 참여한 공동구매입니다."),
 
+    NOT_JOINED(HttpStatus.NOT_FOUND, "참여하지 않은 공동구매입니다."),
+    CANCEL_DEADLINE_PASSED(HttpStatus.CONFLICT, "취소 가능 시간이 지났습니다."),
+
     ;
 
     private final HttpStatus status;

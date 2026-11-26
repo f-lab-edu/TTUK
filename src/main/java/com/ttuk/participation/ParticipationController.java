@@ -31,5 +31,12 @@ public class ParticipationController {
 
     }
 
+    @DeleteMapping("/me")
+    @RequireRole(MemberRole.BUYER)
+    public ResponseEntity<Void> cancel(@PathVariable Long groupPurchaseId, @Login LoginMember loginMember) {
+        participationService.cancel(groupPurchaseId, loginMember.memberId());
+        return ResponseEntity.noContent().build();
+    }
+
 
 }
