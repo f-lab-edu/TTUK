@@ -14,7 +14,7 @@ import java.util.List;
 public interface GroupPurchaseRepository extends JpaRepository<GroupPurchase, Long> {
 
     @Transactional(propagation = Propagation.MANDATORY)
-    @Modifying
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("""
              update GroupPurchase g
                            set g.status = com.ttuk.grouppurchase.GroupPurchaseStatus.CLOSED,

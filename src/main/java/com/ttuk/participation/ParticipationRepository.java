@@ -14,7 +14,7 @@ import java.util.List;
 public interface  ParticipationRepository extends JpaRepository<Participation, Long> {
 
     @Transactional
-    @Modifying
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("""
             update Participation p
                set p.status = com.ttuk.participation.ParticipationStatus.CANCELED,
@@ -28,7 +28,6 @@ public interface  ParticipationRepository extends JpaRepository<Participation, L
                      @Param("memberId") Long memberId,
                      @Param("now") LocalDateTime now);
 
-
     @Query("""
             select p.member.id
               from Participation p
@@ -38,7 +37,7 @@ public interface  ParticipationRepository extends JpaRepository<Participation, L
     List<Long> findJoinedMemberIds(@Param("groupPurchaseId") Long groupPurchaseId);
 
     @Transactional(propagation = Propagation.MANDATORY)
-    @Modifying
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("""
             update Participation p
                set p.status = com.ttuk.participation.ParticipationStatus.CANCELED,

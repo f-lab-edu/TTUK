@@ -36,7 +36,7 @@ public class GroupPurchaseSettlementService {
         LocalDateTime now = LocalDateTime.now(clock);
 
         Optional<SettlementSnapshot> snapshot =
-                groupPurchaseRedisRepository.findSettlementSnapshot(groupPurchaseId);
+                groupPurchaseRedisRepository.takeSettlementSnapshot(groupPurchaseId);
         if (snapshot.isEmpty()) {
             settleWithoutRedis(groupPurchase, now);
             return;
@@ -45,7 +45,7 @@ public class GroupPurchaseSettlementService {
     }
 
     private void settleWithRedis(Long groupPurchaseId, SettlementSnapshot snapshot, LocalDateTime now) {
-        if (snapshot.open()) {
+        if (!snapshot.settleable()) {
             return;
         }
         transactionTemplate.executeWithoutResult(status -> {
