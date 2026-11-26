@@ -4,6 +4,7 @@ import com.ttuk.global.error.BusinessException;
 import com.ttuk.global.error.ErrorCode;
 import com.ttuk.grouppurchase.GroupPurchase;
 import com.ttuk.grouppurchase.GroupPurchaseRepository;
+import com.ttuk.grouppurchase.GroupPurchaseSettlementService;
 import com.ttuk.grouppurchase.GroupPurchaseStatus;
 import com.ttuk.grouppurchase.event.GroupPurchaseCreatedEvent;
 import com.ttuk.grouppurchase.redis.CancelOutcome;
@@ -34,6 +35,7 @@ public class ParticipationService {
     private final MemberRepository memberRepository;
     private final ParticipationRepository participationRepository;
     private final Clock clock;
+    private final GroupPurchaseSettlementService settlementService;
 
     public ParticipationCreateResponse join(Long groupPurchaseId, Long memberId, int quantity) {
         JoinResult result = groupPurchaseRedisRepository.join(groupPurchaseId, memberId);
@@ -42,7 +44,13 @@ public class ParticipationService {
         }
 
         return switch (result.outcome()) {
-            case JOINED -> saveParticipation(groupPurchaseId, memberId, quantity, result);
+            case JOINED -> {
+                ParticipationCreateResponse response = saveParticipation(groupPurchaseId, memberId, quantity, result);
+                if (result.closed()) {
+                    settlementService.settleIfFilled(groupPurchaseId);
+                }
+                yield response;
+            }
             case NOT_OPEN -> throw new BusinessException(ErrorCode.GROUP_PURCHASE_NOT_OPEN);
             case FULL -> throw new BusinessException(ErrorCode.GROUP_PURCHASE_FULL);
             case INVALID_HEADCOUNT -> throw new IllegalStateException("Redis 참여 인원 값이 올바르지 않습니다. groupPurchaseId=" + groupPurchaseId);

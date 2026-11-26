@@ -1,6 +1,6 @@
 -- KEYS[1] meta, KEYS[2] headcount, KEYS[3] price, KEYS[4] status, KEYS[5] participants
 -- ARGV[1] memberId
--- 반환: 성공 { 1, 참여 후 인원, 참여 후 단가 }, 실패 { 결과 코드 }
+-- 반환: 성공 { 1, 참여 후 인원, 참여 후 단가, 정원이 찼으면 1 아니면 0 }, 실패 { 결과 코드 }
 --   -1 초기화 안 됨 / -2 참여할 수 없는 상태 / -3 이미 참여 / -4 정원 마감 / -5 인원 값 이상
 
 if redis.call('EXISTS', KEYS[1]) == 0 then
@@ -52,8 +52,10 @@ local step = math.floor(newHeadcount / discountStepSize)
 local newPrice = math.max(floorPrice, basePrice - step * discountPerStep)
 redis.call('SET', KEYS[3], newPrice, 'KEEPTTL')
 
+local closed = 0
 if maxHeadcount and newHeadcount >= maxHeadcount then
 	redis.call('SET', KEYS[4], 'CLOSED', 'KEEPTTL')
+	closed = 1
 end
 
-return { 1, newHeadcount, newPrice }
+return { 1, newHeadcount, newPrice, closed}

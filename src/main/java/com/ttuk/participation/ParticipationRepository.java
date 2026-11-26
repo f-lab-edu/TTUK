@@ -37,6 +37,14 @@ public interface  ParticipationRepository extends JpaRepository<Participation, L
     List<Long> findJoinedMemberIds(@Param("groupPurchaseId") Long groupPurchaseId);
 
     @Query("""
+            select count(p)
+              from Participation p
+             where p.groupPurchase.id = :groupPurchaseId
+               and p.status = com.ttuk.participation.ParticipationStatus.JOINED
+            """)
+    long countJoined(@Param("groupPurchaseId") Long groupPurchaseId);
+
+    @Query("""
             select case when count(p) > 0 then true else false end
               from Participation p
              where p.groupPurchase.id = :groupPurchaseId
