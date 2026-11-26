@@ -120,4 +120,8 @@ public class GroupPurchase extends BaseTimeEntity {
     public DiscountPolicy discountPolicy() {
         return new DiscountPolicy(basePrice, floorPrice, discountType, discountValue, discountStepSize);
     }
+
+    public boolean isSoldBy(Long memberId){
+        return seller.getId().equals(memberId);
+    }
 }
