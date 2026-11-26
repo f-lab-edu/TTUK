@@ -21,6 +21,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 
 @Repository
@@ -44,6 +45,10 @@ public class GroupPurchaseRedisRepository {
     private static final RedisScript<List> CANCEL_SCRIPT =
             RedisScript.of(new ClassPathResource("redis/cancel_join_group_purchase.lua"), List.class);
 
+    @SuppressWarnings("rawtypes")
+    private static final RedisScript<List> SETTLEMENT_SNAPSHOT_SCRIPT =
+            RedisScript.of(new ClassPathResource("redis/take_settlement_snapshot.lua"), List.class);
+
 
     public boolean initialize(GroupPurchaseCreatedEvent event) {
         return createKeys(event, Set.of());
@@ -64,13 +69,6 @@ public class GroupPurchaseRedisRepository {
                 ? GroupPurchaseStatus.CLOSED
                 : GroupPurchaseStatus.OPEN;
 
-        List<String> keys = List.of(
-                GroupPurchaseRedisKeys.meta(groupPurchaseId),
-                GroupPurchaseRedisKeys.headcount(groupPurchaseId),
-                GroupPurchaseRedisKeys.price(groupPurchaseId),
-                GroupPurchaseRedisKeys.status(groupPurchaseId),
-                GroupPurchaseRedisKeys.participants(groupPurchaseId));
-
         List<String> args = new ArrayList<>();
         args.add(String.valueOf(policy.basePrice()));
         args.add(String.valueOf(policy.floorPrice()));
@@ -87,7 +85,7 @@ public class GroupPurchaseRedisRepository {
             args.add(String.valueOf(memberId));
         }
 
-        Long result = redisTemplate.execute(INIT_SCRIPT, keys, args.toArray());
+        Long result = redisTemplate.execute(INIT_SCRIPT, participationKeys(groupPurchaseId), args.toArray());
         return Long.valueOf(1L).equals(result);
     }
 
@@ -145,10 +143,10 @@ public class GroupPurchaseRedisRepository {
         return JoinResult.from(result);
     }
 
-    public boolean rollbackJoin(Long groupPurchaseId, Long memberId) {
+    public RollbackJoinOutcome rollbackJoin(Long groupPurchaseId, Long memberId) {
         Long result = redisTemplate.execute(ROLLBACK_JOIN_SCRIPT, participationKeys(groupPurchaseId),
                 String.valueOf(memberId));
-        return Long.valueOf(1L).equals(result);
+        return RollbackJoinOutcome.from(result);
     }
 
     public CancelResult cancel(Long groupPurchaseId, Long memberId, LocalDateTime now, Duration cancelableBefore) {
@@ -159,6 +157,19 @@ public class GroupPurchaseRedisRepository {
                 String.valueOf(toEpochSecond(now)),
                 String.valueOf(cancelableBefore.toSeconds()));
         return CancelResult.from(result);
+
+    }
+
+    public Optional<SettlementSnapshot> takeSettlementSnapshot(Long groupPurchaseId) {
+
+        @SuppressWarnings("unchecked")
+        List<String> result = redisTemplate.execute(SETTLEMENT_SNAPSHOT_SCRIPT, participationKeys(groupPurchaseId));
+
+        if(result.isEmpty()){
+            return Optional.empty();
+        }
+
+        return Optional.of(SettlementSnapshot.from(groupPurchaseId, result));
 
     }
 
