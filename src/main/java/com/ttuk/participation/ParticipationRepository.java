@@ -37,7 +37,7 @@ public interface  ParticipationRepository extends JpaRepository<Participation, L
     List<Long> findJoinedMemberIds(@Param("groupPurchaseId") Long groupPurchaseId);
 
     @Transactional(propagation = Propagation.MANDATORY)
-    @Modifying
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("""
             update Participation p
                set p.status = com.ttuk.participation.ParticipationStatus.CANCELED,

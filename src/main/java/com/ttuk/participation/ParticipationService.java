@@ -6,11 +6,7 @@ import com.ttuk.grouppurchase.GroupPurchase;
 import com.ttuk.grouppurchase.GroupPurchaseRepository;
 import com.ttuk.grouppurchase.GroupPurchaseStatus;
 import com.ttuk.grouppurchase.event.GroupPurchaseCreatedEvent;
-import com.ttuk.grouppurchase.redis.CancelOutcome;
-import com.ttuk.grouppurchase.redis.CancelResult;
-import com.ttuk.grouppurchase.redis.GroupPurchaseRedisRepository;
-import com.ttuk.grouppurchase.redis.JoinOutcome;
-import com.ttuk.grouppurchase.redis.JoinResult;
+import com.ttuk.grouppurchase.redis.*;
 import com.ttuk.member.MemberRepository;
 import com.ttuk.participation.dto.ParticipationCreateResponse;
 import lombok.RequiredArgsConstructor;
@@ -137,8 +133,14 @@ public class ParticipationService {
 
     private void rollbackRedis(Long groupPurchaseId, Long memberId, RuntimeException cause) {
         try {
-            if (!groupPurchaseRedisRepository.rollbackJoin(groupPurchaseId, memberId)) {
-                log.warn("참여 보상: 되돌릴 Redis 참여가 없음. groupPurchaseId={}, memberId={}",
+            RollbackJoinOutcome outcome = groupPurchaseRedisRepository.rollbackJoin(groupPurchaseId, memberId);
+            switch (outcome) {
+                case ROLLED_BACK -> {
+                }
+                case NOTHING_TO_ROLLBACK -> log.warn("참여 보상: 되돌릴 Redis 참여가 없음. groupPurchaseId={}, memberId={}",
+                        groupPurchaseId, memberId);
+                case SETTLED -> log.error("참여 보상 불가: 이미 정산돼 Redis 참여를 되돌리지 않음. "
+                                + "정산 대조에서 DB에 없는 Redis 참여자로 남음. groupPurchaseId={}, memberId={}",
                         groupPurchaseId, memberId);
             }
         } catch (RuntimeException rollbackFailure) {
