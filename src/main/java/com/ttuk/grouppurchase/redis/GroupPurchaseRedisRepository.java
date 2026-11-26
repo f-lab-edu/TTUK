@@ -2,7 +2,7 @@ package com.ttuk.grouppurchase.redis;
 
 import com.ttuk.global.config.ClockConfig;
 import com.ttuk.grouppurchase.DiscountPolicy;
-import com.ttuk.grouppurchase.GroupPurchase;
+import com.ttuk.grouppurchase.GroupPurchaseStatus;
 import com.ttuk.grouppurchase.event.GroupPurchaseCreatedEvent;
 import lombok.RequiredArgsConstructor;
 import org.springframework.core.io.ClassPathResource;
@@ -15,7 +15,14 @@ import org.springframework.stereotype.Repository;
 
 import java.time.Duration;
 import java.time.LocalDateTime;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
 
 @Repository
 @RequiredArgsConstructor
@@ -43,38 +50,50 @@ public class GroupPurchaseRedisRepository {
             RedisScript.of(new ClassPathResource("redis/read_settlement_snapshot.lua"), List.class);
 
 
-    public boolean initialize(GroupPurchaseCreatedEvent event){
+    public boolean initialize(GroupPurchaseCreatedEvent event) {
+        return createKeys(event, Set.of());
+    }
+
+    public boolean restore(GroupPurchaseCreatedEvent event, Collection<Long> joinedMemberIds) {
+        return createKeys(event, new HashSet<>(joinedMemberIds));
+    }
+
+    private boolean createKeys(GroupPurchaseCreatedEvent event, Set<Long> participantIds) {
+        Long groupPurchaseId = event.groupPurchaseId();
         DiscountPolicy policy = new DiscountPolicy(event.basePrice(), event.floorPrice(),
                 event.discountType(), event.discountValue(), event.discountStepSize());
-        return initialize(event.groupPurchaseId(), policy, event.maxHeadcount(), event.closeAt());
-    }
+        Integer maxHeadcount = event.maxHeadcount();
 
-    public boolean initialize(GroupPurchase groupPurchase) {
-        DiscountPolicy policy = new DiscountPolicy(groupPurchase.getBasePrice(), groupPurchase.getFloorPrice(),
-                groupPurchase.getDiscountType(), groupPurchase.getDiscountValue(), groupPurchase.getDiscountStepSize());
-        return initialize(groupPurchase.getId(), policy, groupPurchase.getMaxHeadcount(), groupPurchase.getCloseAt());
-    }
-
-    private boolean initialize(Long groupPurchaseId, DiscountPolicy policy, Integer maxHeadcount, LocalDateTime closeAt) {
+        int headcount = participantIds.size();
+        GroupPurchaseStatus status = maxHeadcount != null && headcount >= maxHeadcount
+                ? GroupPurchaseStatus.CLOSED
+                : GroupPurchaseStatus.OPEN;
 
         List<String> keys = List.of(
                 GroupPurchaseRedisKeys.meta(groupPurchaseId),
                 GroupPurchaseRedisKeys.headcount(groupPurchaseId),
                 GroupPurchaseRedisKeys.price(groupPurchaseId),
-                GroupPurchaseRedisKeys.status(groupPurchaseId));
+                GroupPurchaseRedisKeys.status(groupPurchaseId),
+                GroupPurchaseRedisKeys.participants(groupPurchaseId));
 
-        Long result = redisTemplate.execute(INIT_SCRIPT, keys,
-                String.valueOf(policy.basePrice()),
-                String.valueOf(policy.floorPrice()),
-                policy.discountType().name(),
-                String.valueOf(policy.discountValue()),
-                String.valueOf(policy.discountStepSize()),
-                maxHeadcount == null ? UNLIMITED : String.valueOf(maxHeadcount),
-                String.valueOf(toEpochSecond(closeAt)),
-                String.valueOf(toEpochSecond(closeAt.plus(KEEP_AFTER_CLOSE))));
+        List<String> args = new ArrayList<>();
+        args.add(String.valueOf(policy.basePrice()));
+        args.add(String.valueOf(policy.floorPrice()));
+        args.add(policy.discountType().name());
+        args.add(String.valueOf(policy.discountValue()));
+        args.add(String.valueOf(policy.discountStepSize()));
+        args.add(maxHeadcount == null ? UNLIMITED : String.valueOf(maxHeadcount));
+        args.add(String.valueOf(toEpochSecond(event.closeAt())));
+        args.add(String.valueOf(toEpochSecond(event.closeAt().plus(KEEP_AFTER_CLOSE))));
+        args.add(String.valueOf(headcount));
+        args.add(String.valueOf(policy.priceAt(headcount)));
+        args.add(status.name());
+        for (Long memberId : participantIds) {
+            args.add(String.valueOf(memberId));
+        }
 
+        Long result = redisTemplate.execute(INIT_SCRIPT, keys, args.toArray());
         return Long.valueOf(1L).equals(result);
-
     }
 
 

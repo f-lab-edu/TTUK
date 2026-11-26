@@ -14,7 +14,7 @@ import java.util.List;
 public interface  ParticipationRepository extends JpaRepository<Participation, Long> {
 
     @Transactional
-    @Modifying
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("""
             update Participation p
                set p.status = com.ttuk.participation.ParticipationStatus.CANCELED,
@@ -27,7 +27,6 @@ public interface  ParticipationRepository extends JpaRepository<Participation, L
     int cancelJoined(@Param("groupPurchaseId") Long groupPurchaseId,
                      @Param("memberId") Long memberId,
                      @Param("now") LocalDateTime now);
-
 
     @Query("""
             select p.member.id
