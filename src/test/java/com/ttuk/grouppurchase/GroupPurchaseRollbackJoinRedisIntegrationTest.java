@@ -4,6 +4,7 @@ import com.ttuk.global.config.ClockConfig;
 import com.ttuk.grouppurchase.event.GroupPurchaseCreatedEvent;
 import com.ttuk.grouppurchase.redis.GroupPurchaseRedisKeys;
 import com.ttuk.grouppurchase.redis.GroupPurchaseRedisRepository;
+import com.ttuk.grouppurchase.redis.RollbackJoinOutcome;
 import com.ttuk.support.TestcontainersConfig;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
@@ -50,12 +51,12 @@ class GroupPurchaseRollbackJoinRedisIntegrationTest {
         groupPurchaseRedisRepository.join(GROUP_PURCHASE_ID, 1L);
         groupPurchaseRedisRepository.join(GROUP_PURCHASE_ID, 2L);
 
-        boolean rolledBack = groupPurchaseRedisRepository.rollbackJoin(GROUP_PURCHASE_ID, 2L);
-        boolean rolledBackAgain = groupPurchaseRedisRepository.rollbackJoin(GROUP_PURCHASE_ID, 2L);
+        RollbackJoinOutcome rolledBack = groupPurchaseRedisRepository.rollbackJoin(GROUP_PURCHASE_ID, 2L);
+        RollbackJoinOutcome rolledBackAgain = groupPurchaseRedisRepository.rollbackJoin(GROUP_PURCHASE_ID, 2L);
 
         DiscountPolicy policy = new DiscountPolicy(3000, 2500, DiscountType.RATE, 5, 2);
-        assertThat(rolledBack).isTrue();
-        assertThat(rolledBackAgain).isFalse();
+        assertThat(rolledBack).isEqualTo(RollbackJoinOutcome.ROLLED_BACK);
+        assertThat(rolledBackAgain).isEqualTo(RollbackJoinOutcome.NOTHING_TO_ROLLBACK);
         assertThat(value(GroupPurchaseRedisKeys.headcount(GROUP_PURCHASE_ID))).isEqualTo("1");
         assertThat(value(GroupPurchaseRedisKeys.price(GROUP_PURCHASE_ID)))
                 .isEqualTo(String.valueOf(policy.priceAt(1)));
@@ -65,6 +66,26 @@ class GroupPurchaseRollbackJoinRedisIntegrationTest {
         assertThat(redisTemplate.getExpire(GroupPurchaseRedisKeys.status(GROUP_PURCHASE_ID)))
                 .isCloseTo(closeAt.atZone(ClockConfig.SERVICE_ZONE).toEpochSecond()
                         - Instant.now(clock).getEpochSecond(), within(5L));
+    }
+
+    @Test
+    @DisplayName("정산 스냅샷을 찍은 뒤에는 참여를 되돌리지 않고 SETTLED이며, 인원·참여자·CLOSED가 그대로다")
+    void rollbackJoin_afterSettlementSnapshot() {
+        LocalDateTime closeAt = LocalDateTime.now(clock).plusDays(3).withNano(0);
+        groupPurchaseRedisRepository.initialize(new GroupPurchaseCreatedEvent(
+                GROUP_PURCHASE_ID, 1L, "대파 한 단",
+                3000, 2500, DiscountType.RATE, 5, 2, 2, closeAt));
+        groupPurchaseRedisRepository.join(GROUP_PURCHASE_ID, 1L);
+        groupPurchaseRedisRepository.join(GROUP_PURCHASE_ID, 2L);
+        groupPurchaseRedisRepository.takeSettlementSnapshot(GROUP_PURCHASE_ID);
+
+        RollbackJoinOutcome outcome = groupPurchaseRedisRepository.rollbackJoin(GROUP_PURCHASE_ID, 2L);
+
+        assertThat(outcome).isEqualTo(RollbackJoinOutcome.SETTLED);
+        assertThat(value(GroupPurchaseRedisKeys.headcount(GROUP_PURCHASE_ID))).isEqualTo("2");
+        assertThat(redisTemplate.opsForSet().members(GroupPurchaseRedisKeys.participants(GROUP_PURCHASE_ID)))
+                .containsExactlyInAnyOrder("1", "2");
+        assertThat(value(GroupPurchaseRedisKeys.status(GROUP_PURCHASE_ID))).isEqualTo("CLOSED");
     }
 
     private String value(String key) {

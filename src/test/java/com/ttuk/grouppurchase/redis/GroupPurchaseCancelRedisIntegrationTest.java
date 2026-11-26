@@ -5,6 +5,7 @@ import com.ttuk.category.CategoryRepository;
 import com.ttuk.grouppurchase.DiscountType;
 import com.ttuk.grouppurchase.GroupPurchase;
 import com.ttuk.grouppurchase.GroupPurchaseRepository;
+import com.ttuk.grouppurchase.event.GroupPurchaseCreatedEvent;
 import com.ttuk.member.Member;
 import com.ttuk.member.MemberRepository;
 import com.ttuk.member.MemberRole;
@@ -168,7 +169,7 @@ class GroupPurchaseCancelRedisIntegrationTest {
                 .maxHeadcount(maxHeadcount)
                 .closeAt(LocalDateTime.now(clock).plusDays(3).withNano(0))
                 .build());
-        groupPurchaseRedisRepository.initialize(groupPurchase);
+        groupPurchaseRedisRepository.initialize(GroupPurchaseCreatedEvent.from(groupPurchase));
         return groupPurchase.getId();
     }
 }

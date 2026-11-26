@@ -9,7 +9,8 @@ import org.springframework.stereotype.Component;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.LocalDateTime;
-import java.util.List;
+import java.util.LinkedHashSet;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
 @Slf4j
@@ -25,16 +26,18 @@ public class GroupPurchaseSettlementScheduler {
     private final Clock clock;
 
     @Scheduled(fixedDelay = 30, timeUnit = TimeUnit.SECONDS)
-    public void settleClosedGroupPurchases(){
+    public void settleDueGroupPurchases() {
 
-        LocalDateTime threshold = LocalDateTime.now(clock).minus(SETTLE_AFTER_CLOSE);
-        List<Long> ids = groupPurchaseRepository.findSettlementTargetIds(threshold, Limit.of(BATCH_SIZE));
-        for(Long id: ids){
-            try {
-                settlementService.settle(id);
-            } catch (RuntimeException e) {
-                log.error("정산 실패. groupPurchaseId={}", id, e);
-            }
+        LocalDateTime now = LocalDateTime.now(clock);
+        LocalDateTime threshold = now.minus(SETTLE_AFTER_CLOSE);
+        int maxFailures = GroupPurchaseSettlementService.MAX_SETTLE_FAILURES;
+
+        Set<Long> ids = new LinkedHashSet<>();
+        ids.addAll(groupPurchaseRepository.findSettlementTargetIds(threshold, maxFailures, now, Limit.of(BATCH_SIZE)));
+        ids.addAll(groupPurchaseRepository.findFilledSettlementTargetIds(maxFailures, now, Limit.of(BATCH_SIZE)));
+
+        for (Long id : ids) {
+            settlementService.settleSafely(id);
         }
 
     }
