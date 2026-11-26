@@ -84,6 +84,11 @@ public class GroupPurchase extends BaseTimeEntity {
 
     private LocalDateTime canceledAt;
 
+    @Column(nullable = false)
+    private int settleFailCount;
+
+    private LocalDateTime nextSettleAt;
+
     @Builder
     private GroupPurchase(Member seller, Category category, String title, String description,
                           String unit, int basePrice, int floorPrice,
