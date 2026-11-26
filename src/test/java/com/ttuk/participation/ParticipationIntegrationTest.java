@@ -124,6 +124,27 @@ class ParticipationIntegrationTest {
     }
 
     @Test
+    @DisplayName("DB에 이미 JOINED인데 Redis 참여자에 빠져 있으면 유니크 제약으로 409 ALREADY_JOINED이고, Redis에 들어간 참여는 되돌리지 않는다")
+    void join_alreadyJoinedInDb() throws Exception {
+        Long id = openGroupPurchase();
+        participationRepository.save(Participation.builder()
+                .groupPurchase(groupPurchaseRepository.getReferenceById(id))
+                .member(buyer)
+                .quantity(1)
+                .joinedAt(LocalDateTime.now(clock))
+                .build());
+
+        join(id, buyerCookie)
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.error.code").value("ALREADY_JOINED"));
+
+        assertThat(participationRepository.count()).isEqualTo(1);
+        assertThat(redisTemplate.opsForValue().get(GroupPurchaseRedisKeys.headcount(id))).isEqualTo("1");
+        assertThat(redisTemplate.opsForSet().isMember(GroupPurchaseRedisKeys.participants(id),
+                String.valueOf(buyer.getId()))).isTrue();
+    }
+
+    @Test
     @DisplayName("Redis에도 DB에도 없는 공동구매면 404다")
     void join_notFound() throws Exception {
         join(999_999L, buyerCookie)

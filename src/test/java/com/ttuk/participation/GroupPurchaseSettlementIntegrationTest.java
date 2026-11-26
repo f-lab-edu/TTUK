@@ -2,6 +2,7 @@ package com.ttuk.grouppurchase;
 
 import com.ttuk.category.Category;
 import com.ttuk.category.CategoryRepository;
+import com.ttuk.grouppurchase.event.GroupPurchaseCreatedEvent;
 import com.ttuk.grouppurchase.redis.GroupPurchaseRedisKeys;
 import com.ttuk.grouppurchase.redis.GroupPurchaseRedisRepository;
 import com.ttuk.member.Member;
@@ -143,6 +144,21 @@ class GroupPurchaseSettlementIntegrationTest {
         assertThat(row.get("final_price")).isEqualTo(2850);
     }
 
+    @Test
+    @DisplayName("Redis status가 CANCELED(판매자 취소 진행 중)면 정산하지 않고 정산 표시도 남기지 않는다")
+    void settle_canceledInRedis() {
+        Long id = openGroupPurchase();
+        participationService.join(id, buyer1.getId(), 1);
+        redisTemplate.opsForValue().set(GroupPurchaseRedisKeys.status(id), "CANCELED");
+
+        settlementService.settle(id);
+
+        Map<String, Object> row = groupPurchaseRow(id);
+        assertThat(row.get("status")).isEqualTo("OPEN");
+        assertThat(row.get("final_headcount")).isNull();
+        assertThat(redisTemplate.opsForHash().hasKey(GroupPurchaseRedisKeys.meta(id), "settled")).isFalse();
+    }
+
     private void expireStatus(Long groupPurchaseId) {
         redisTemplate.delete(GroupPurchaseRedisKeys.status(groupPurchaseId));
     }
@@ -165,7 +181,7 @@ class GroupPurchaseSettlementIntegrationTest {
 
     private Long openGroupPurchase() {
         GroupPurchase groupPurchase = saveGroupPurchase(LocalDateTime.now(clock).plusDays(3).withNano(0));
-        groupPurchaseRedisRepository.initialize(groupPurchase);
+        groupPurchaseRedisRepository.initialize(GroupPurchaseCreatedEvent.from(groupPurchase));
         return groupPurchase.getId();
     }
 

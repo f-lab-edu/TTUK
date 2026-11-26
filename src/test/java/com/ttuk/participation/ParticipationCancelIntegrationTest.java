@@ -5,6 +5,7 @@ import com.ttuk.category.CategoryRepository;
 import com.ttuk.grouppurchase.DiscountType;
 import com.ttuk.grouppurchase.GroupPurchase;
 import com.ttuk.grouppurchase.GroupPurchaseRepository;
+import com.ttuk.grouppurchase.event.GroupPurchaseCreatedEvent;
 import com.ttuk.grouppurchase.redis.GroupPurchaseRedisKeys;
 import com.ttuk.grouppurchase.redis.GroupPurchaseRedisRepository;
 import com.ttuk.member.Member;
@@ -121,6 +122,25 @@ class ParticipationCancelIntegrationTest {
     }
 
     @Test
+    @DisplayName("Redis가 없으면 DB 참여자로 복원한 뒤 Redis에서 취소해, 204이고 Redis 인원이 줄고 참여자에서 빠진다")
+    void cancel_withoutRedis_restoresThenCancels() throws Exception {
+        Long id = openGroupPurchase();
+        Member other = memberRepository.save(member("other@ttuk.kr", "다른구매자", MemberRole.BUYER, "01055556666"));
+        participationService.join(id, buyer.getId(), 2);
+        participationService.join(id, other.getId(), 1);
+        redisTemplate.delete(redisTemplate.keys("group_purchase:*"));
+
+        cancel(id, buyerCookie).andExpect(status().isNoContent());
+
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT status FROM participation WHERE member_id = ?", String.class, buyer.getId()))
+                .isEqualTo("CANCELED");
+        assertThat(redisTemplate.opsForValue().get(GroupPurchaseRedisKeys.headcount(id))).isEqualTo("1");
+        assertThat(redisTemplate.opsForSet().members(GroupPurchaseRedisKeys.participants(id)))
+                .containsExactly(String.valueOf(other.getId()));
+    }
+
+    @Test
     @DisplayName("참여하지 않은 공동구매를 취소하면 404 NOT_JOINED다")
     void cancel_notJoined() throws Exception {
         Long id = openGroupPurchase();
@@ -164,7 +184,7 @@ class ParticipationCancelIntegrationTest {
                 .maxHeadcount(50)
                 .closeAt(LocalDateTime.now(clock).plusDays(3).withNano(0))
                 .build());
-        groupPurchaseRedisRepository.initialize(groupPurchase);
+        groupPurchaseRedisRepository.initialize(GroupPurchaseCreatedEvent.from(groupPurchase));
         return groupPurchase.getId();
     }
 

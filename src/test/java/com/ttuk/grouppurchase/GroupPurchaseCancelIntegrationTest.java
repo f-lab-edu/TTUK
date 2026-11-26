@@ -2,6 +2,7 @@ package com.ttuk.grouppurchase;
 
 import com.ttuk.category.Category;
 import com.ttuk.category.CategoryRepository;
+import com.ttuk.grouppurchase.event.GroupPurchaseCreatedEvent;
 import com.ttuk.grouppurchase.redis.GroupPurchaseRedisKeys;
 import com.ttuk.grouppurchase.redis.GroupPurchaseRedisRepository;
 import com.ttuk.member.Member;
@@ -142,6 +143,27 @@ class GroupPurchaseCancelIntegrationTest {
     }
 
     @Test
+    @DisplayName("Redis 키가 없으면 DB 참여자로 복원한 뒤 취소해, 알림 대상 수와 취소 시점 인원이 DB 참여자 기준이다")
+    void cancel_restoresParticipantsWhenRedisMissing() throws Exception {
+
+        Long id = openGroupPurchase(50);
+        participationService.join(id, buyer1.getId(), 1);
+        participationService.join(id, buyer2.getId(), 3);
+        redisTemplate.delete(redisTemplate.keys("group_purchase:*"));
+
+        cancel(id, sellerCookie)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.notifiedCount").value(2));
+
+        Map<String, Object> row = groupPurchaseRow(id);
+        assertThat(row.get("status")).isEqualTo("CANCELED");
+        assertThat(row.get("final_headcount")).isEqualTo(2);
+        assertThat(row.get("final_price")).isEqualTo(2850);
+        assertThat(redisStatus(id)).isEqualTo("CANCELED");
+
+    }
+
+    @Test
     @DisplayName("정원이 차서 마감된 공동구매는 취소할 수 없다 (409)")
     void cancel_closed() throws Exception {
 
@@ -221,7 +243,7 @@ class GroupPurchaseCancelIntegrationTest {
                 .maxHeadcount(maxHeadcount)
                 .closeAt(LocalDateTime.now(clock).plusDays(3).withNano(0))
                 .build());
-        groupPurchaseRedisRepository.initialize(groupPurchase);
+        groupPurchaseRedisRepository.initialize(GroupPurchaseCreatedEvent.from(groupPurchase));
         return groupPurchase.getId();
     }
 
