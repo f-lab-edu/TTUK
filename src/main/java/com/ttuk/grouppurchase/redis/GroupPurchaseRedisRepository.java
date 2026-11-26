@@ -49,6 +49,13 @@ public class GroupPurchaseRedisRepository {
     private static final RedisScript<List> SETTLEMENT_SNAPSHOT_SCRIPT =
             RedisScript.of(new ClassPathResource("redis/take_settlement_snapshot.lua"), List.class);
 
+    @SuppressWarnings("rawtypes")
+    private static final RedisScript<List> CANCEL_GROUP_PURCHASE_SCRIPT =
+            RedisScript.of(new ClassPathResource("redis/cancel_group_purchase.lua"), List.class);
+
+    private static final RedisScript<Long> REOPEN_GROUP_PURCHASE_SCRIPT =
+            RedisScript.of(new ClassPathResource("redis/reopen_group_purchase.lua"), Long.class);
+
 
     public boolean initialize(GroupPurchaseCreatedEvent event) {
         return createKeys(event, Set.of());
@@ -170,6 +177,23 @@ public class GroupPurchaseRedisRepository {
         }
 
         return Optional.of(SettlementSnapshot.from(groupPurchaseId, result));
+
+    }
+
+    public GroupPurchaseCancelResult cancelGroupPurchase(Long groupPurchaseId) {
+
+        @SuppressWarnings("unchecked")
+        List<Long> result = redisTemplate.execute(CANCEL_GROUP_PURCHASE_SCRIPT,
+                participationKeys(groupPurchaseId));
+        return GroupPurchaseCancelResult.from(result);
+
+    }
+
+    public boolean reopenGroupPurchase(Long groupPurchaseId) {
+
+        Long result = redisTemplate.execute(REOPEN_GROUP_PURCHASE_SCRIPT,
+                List.of(GroupPurchaseRedisKeys.status(groupPurchaseId)));
+        return Long.valueOf(1L).equals(result);
 
     }
 
