@@ -16,9 +16,14 @@ import java.time.LocalDateTime;
 @Entity
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-@Table(uniqueConstraints = @UniqueConstraint(
-        name = "uk_participation_joined_member",
-        columnNames = {"group_purchase_id", "joined_member_id"}))
+@Table(
+        indexes = {
+                @Index(name = "idx_participation_group_purchase_status_quantity",
+                        columnList = "group_purchase_id, status, quantity")
+        },
+        uniqueConstraints = @UniqueConstraint(
+                name = "uk_participation_joined_member",
+                columnNames = {"group_purchase_id", "joined_member_id"}))
 public class Participation extends BaseTimeEntity {
 
     @Id

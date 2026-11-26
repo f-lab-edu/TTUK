@@ -1,5 +1,6 @@
 package com.ttuk.participation;
 
+import com.ttuk.participation.dto.JoinedQuantity;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -68,4 +69,14 @@ public interface  ParticipationRepository extends JpaRepository<Participation, L
     int cancelJoinedMembers(@Param("groupPurchaseId") Long groupPurchaseId,
                             @Param("memberIds") Collection<Long> memberIds,
                             @Param("now") LocalDateTime now);
+
+    @Query("""
+            select new com.ttuk.participation.dto.JoinedQuantity(p.groupPurchase.id, sum(p.quantity))
+              from Participation p
+             where p.groupPurchase.id in :groupPurchaseIds
+               and p.status = com.ttuk.participation.ParticipationStatus.JOINED
+             group by p.groupPurchase.id
+            """)
+    List<JoinedQuantity> sumJoinedQuantities(@Param("groupPurchaseIds") Collection<Long> groupPurchaseIds);
+
 }
