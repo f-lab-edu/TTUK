@@ -98,6 +98,41 @@ class ParticipationRecoveryIntegrationTest {
     }
 
     @Test
+    @DisplayName("Redis가 없으면 DB에 JOINED로 남은 참여자로 복원해서, 기존 참여자가 다시 참여하면 409 ALREADY_JOINED다")
+    void join_lazyInit_restoresJoinedMembers() throws Exception {
+        GroupPurchase groupPurchase = saveGroupPurchase(LocalDateTime.now(clock).plusDays(3));
+        Long id = groupPurchase.getId();
+        Member other = memberRepository.save(member("other@ttuk.kr", "다른구매자", MemberRole.BUYER, "01055556666"));
+        saveJoined(groupPurchase, buyer);
+        saveJoined(groupPurchase, other);
+
+        join(id)
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.error.code").value("ALREADY_JOINED"));
+
+        assertThat(redisTemplate.opsForValue().get(GroupPurchaseRedisKeys.headcount(id))).isEqualTo("2");
+        assertThat(redisTemplate.opsForSet().members(GroupPurchaseRedisKeys.participants(id)))
+                .containsExactlyInAnyOrder(String.valueOf(buyer.getId()), String.valueOf(other.getId()));
+        assertThat(participationRepository.count()).isEqualTo(2);
+    }
+
+    @Test
+    @DisplayName("Redis가 없고 DB의 JOINED 참여자가 정원만큼이면 CLOSED로 복원되어 409 GROUP_PURCHASE_FULL이다")
+    void join_lazyInit_restoredFull() throws Exception {
+        GroupPurchase groupPurchase = saveGroupPurchase(LocalDateTime.now(clock).plusDays(3), 2, 2);
+        Long id = groupPurchase.getId();
+        saveJoined(groupPurchase, memberRepository.save(member("first@ttuk.kr", "첫구매자", MemberRole.BUYER, "01055556666")));
+        saveJoined(groupPurchase, memberRepository.save(member("second@ttuk.kr", "둘째구매자", MemberRole.BUYER, "01077778888")));
+
+        join(id)
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.error.code").value("GROUP_PURCHASE_FULL"));
+
+        assertThat(redisTemplate.opsForValue().get(GroupPurchaseRedisKeys.status(id))).isEqualTo("CLOSED");
+        assertThat(participationRepository.count()).isEqualTo(2);
+    }
+
+    @Test
     @DisplayName("Redis가 없고 DB상 마감 시각이 지났으면 초기화하지 않고 409 GROUP_PURCHASE_NOT_OPEN이다")
     void join_lazyInit_afterClose() throws Exception {
         GroupPurchase groupPurchase = saveGroupPurchase(LocalDateTime.now(clock).minusDays(2));
@@ -135,7 +170,20 @@ class ParticipationRecoveryIntegrationTest {
                 .cookie(buyerCookie));
     }
 
+    private void saveJoined(GroupPurchase groupPurchase, Member member) {
+        participationRepository.save(Participation.builder()
+                .groupPurchase(groupPurchase)
+                .member(member)
+                .quantity(1)
+                .joinedAt(LocalDateTime.now(clock))
+                .build());
+    }
+
     private GroupPurchase saveGroupPurchase(LocalDateTime closeAt) {
+        return saveGroupPurchase(closeAt, 50, 10);
+    }
+
+    private GroupPurchase saveGroupPurchase(LocalDateTime closeAt, int maxHeadcount, int discountStepSize) {
         Category category = categoryRepository.findById(FRESH_FOOD_ID).orElseThrow();
         return groupPurchaseRepository.save(GroupPurchase.builder()
                 .seller(seller)
@@ -147,8 +195,8 @@ class ParticipationRecoveryIntegrationTest {
                 .floorPrice(2500)
                 .discountType(DiscountType.RATE)
                 .discountValue(5)
-                .discountStepSize(10)
-                .maxHeadcount(50)
+                .discountStepSize(discountStepSize)
+                .maxHeadcount(maxHeadcount)
                 .closeAt(closeAt.withNano(0))
                 .build());
     }
