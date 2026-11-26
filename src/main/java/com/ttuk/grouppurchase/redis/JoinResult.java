@@ -23,7 +23,4 @@ public record JoinResult(
 
     }
 
-    public boolean joined(){
-        return outcome == JoinOutcome.JOINED;
-    }
 }
