@@ -16,6 +16,7 @@ import com.ttuk.grouppurchase.redis.GroupPurchaseCancelResult;
 import com.ttuk.grouppurchase.redis.GroupPurchaseRedisRepository;
 import com.ttuk.member.Member;
 import com.ttuk.member.MemberRepository;
+import com.ttuk.participation.ParticipationRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
@@ -48,6 +49,7 @@ public class GroupPurchaseService {
     private final ApplicationEventPublisher eventPublisher;
     private final Clock clock;
     private final GroupPurchaseRedisRepository groupPurchaseRedisRepository;
+    private final ParticipationRepository participationRepository;
 
     public GroupPurchaseCreateResponse create(Long sellerId, GroupPurchaseCreateRequest request,
                                               List<MultipartFile> images) {
@@ -172,14 +174,19 @@ public class GroupPurchaseService {
     private GroupPurchaseCancelResult initializeAndRetryCancel(GroupPurchase groupPurchase, LocalDateTime now){
 
         if(!groupPurchase.isJoinableAt(now)){
-                throw new BusinessException(ErrorCode.GROUP_PURCHASE_NOT_OPEN);
+            throw new BusinessException(ErrorCode.GROUP_PURCHASE_NOT_OPEN);
         }
 
-        groupPurchaseRedisRepository.initialize(groupPurchase);
-        return groupPurchaseRedisRepository.cancelGroupPurchase(groupPurchase.getId());
+        Long groupPurchaseId = groupPurchase.getId();
+        List<Long> joinedMemberIds = participationRepository.findJoinedMemberIds(groupPurchaseId);
+        groupPurchaseRedisRepository.restore(GroupPurchaseCreatedEvent.from(groupPurchase), joinedMemberIds);
+        return groupPurchaseRedisRepository.cancelGroupPurchase(groupPurchaseId);
 
     }
 
+    // reopen은 cancelOpen이 예외로 실패해 DB가 OPEN으로 남았을 때만 한다.
+    // 0행이면 그 순간 DB가 이미 OPEN이 아니라는 뜻(다른 취소 요청이 먼저 마무리함)이라,
+    // Redis를 되돌리면 DB는 CANCELED인데 Redis는 OPEN이 되어 취소된 공동구매가 참여를 받게 된다.
     private GroupPurchaseCancelResponse saveCanceled(Long groupPurchaseId, String reason, GroupPurchaseCancelResult result, LocalDateTime now) {
 
         int updated;
@@ -192,10 +199,9 @@ public class GroupPurchaseService {
         }
 
         if(updated == 0){
-            BusinessException notOpen = new BusinessException(ErrorCode.GROUP_PURCHASE_NOT_OPEN);
-            log.warn("판매자 취소: Redis는 OPEN이었는데 DB가 OPEN이 아님. groupPurchaseId={}", groupPurchaseId);
-            reopenRedis(groupPurchaseId, notOpen);
-            throw notOpen;
+            log.warn("판매자 취소: Redis는 이번 요청이 CANCELED로 바꿨지만 DB가 이미 OPEN이 아님. "
+                    + "다른 요청이 먼저 마무리한 것으로 보고 Redis를 되돌리지 않음. groupPurchaseId={}", groupPurchaseId);
+            throw new BusinessException(ErrorCode.GROUP_PURCHASE_NOT_OPEN);
         }
 
         return cancelResponse(groupPurchaseId, reason, result, now);
