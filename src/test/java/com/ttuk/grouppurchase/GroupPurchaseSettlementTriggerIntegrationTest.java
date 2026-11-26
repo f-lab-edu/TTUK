@@ -2,11 +2,13 @@ package com.ttuk.grouppurchase;
 
 import com.ttuk.category.Category;
 import com.ttuk.category.CategoryRepository;
+import com.ttuk.grouppurchase.event.GroupPurchaseCreatedEvent;
 import com.ttuk.grouppurchase.redis.GroupPurchaseRedisKeys;
 import com.ttuk.grouppurchase.redis.GroupPurchaseRedisRepository;
 import com.ttuk.member.Member;
 import com.ttuk.member.MemberRepository;
 import com.ttuk.member.MemberRole;
+import com.ttuk.participation.Participation;
 import com.ttuk.participation.ParticipationRepository;
 import com.ttuk.participation.ParticipationService;
 import com.ttuk.support.TestcontainersConfig;
@@ -82,7 +84,7 @@ class GroupPurchaseSettlementTriggerIntegrationTest {
         GroupPurchase closedJustNow = saveGroupPurchase(now.minusSeconds(30), 50);
         GroupPurchase stillOpen = saveGroupPurchase(now.plusDays(3), 50);
 
-        settlementScheduler.settleClosedGroupPurchases();
+        settlementScheduler.settleDueGroupPurchases();
 
         assertThat(statusOf(closedLongAgo.getId())).isEqualTo("CLOSED");
         assertThat(statusOf(closedJustNow.getId())).isEqualTo("OPEN");
@@ -93,25 +95,35 @@ class GroupPurchaseSettlementTriggerIntegrationTest {
     @DisplayName("스케줄러는 한 공동구매의 정산이 실패해도 다음 공동구매를 정산한다")
     void scheduler_continuesAfterFailure() {
         LocalDateTime now = LocalDateTime.now(clock).withNano(0);
-        GroupPurchase broken = saveGroupPurchase(now.plusDays(3), 50);
-        groupPurchaseRedisRepository.initialize(broken);
-        jdbcTemplate.update("UPDATE group_purchase SET close_at = ? WHERE id = ?",
-                now.minusHours(2), broken.getId());
-        redisTemplate.delete(GroupPurchaseRedisKeys.status(broken.getId()));
-        redisTemplate.delete(GroupPurchaseRedisKeys.headcount(broken.getId()));
+        GroupPurchase broken = saveBrokenGroupPurchase(now);
         GroupPurchase normal = saveGroupPurchase(now.minusHours(1), 50);
 
-        settlementScheduler.settleClosedGroupPurchases();
+        settlementScheduler.settleDueGroupPurchases();
 
         assertThat(statusOf(broken.getId())).isEqualTo("OPEN");
         assertThat(statusOf(normal.getId())).isEqualTo("CLOSED");
     }
 
     @Test
+    @DisplayName("정산이 실패하면 실패 횟수와 다음 시도 시각을 기록하고, 그 시각 전에는 다시 시도하지 않는다")
+    void scheduler_recordsFailureAndWaits() {
+        LocalDateTime now = LocalDateTime.now(clock).withNano(0);
+        GroupPurchase broken = saveBrokenGroupPurchase(now);
+
+        settlementScheduler.settleDueGroupPurchases();
+        settlementScheduler.settleDueGroupPurchases();
+
+        assertThat(failCountOf(broken.getId())).isEqualTo(1);
+        assertThat(nextSettleAtOf(broken.getId()))
+                .isAfter(now.plusSeconds(50))
+                .isBefore(now.plusSeconds(70));
+    }
+
+    @Test
     @DisplayName("정원을 채운 참여 직후 바로 정산하고, 그 전 참여에서는 정산하지 않는다")
     void join_settlesWhenFilled() {
         GroupPurchase groupPurchase = saveGroupPurchase(LocalDateTime.now(clock).plusDays(3).withNano(0), 2);
-        groupPurchaseRedisRepository.initialize(groupPurchase);
+        groupPurchaseRedisRepository.initialize(GroupPurchaseCreatedEvent.from(groupPurchase));
         Long id = groupPurchase.getId();
 
         participationService.join(id, buyer1.getId(), 1);
@@ -124,9 +136,70 @@ class GroupPurchaseSettlementTriggerIntegrationTest {
         assertThat(row.get("final_price")).isEqualTo(2850);
     }
 
+    @Test
+    @DisplayName("정원을 채웠어도 다른 참여자의 DB 저장이 끝나지 않았으면 바로 정산하지 않는다")
+    void join_skipsSettlementWhileOtherJoinIsSaving() {
+        GroupPurchase groupPurchase = saveGroupPurchase(LocalDateTime.now(clock).plusDays(3).withNano(0), 2);
+        groupPurchaseRedisRepository.initialize(GroupPurchaseCreatedEvent.from(groupPurchase));
+        Long id = groupPurchase.getId();
+        groupPurchaseRedisRepository.join(id, buyer1.getId());
+
+        participationService.join(id, buyer2.getId(), 1);
+
+        assertThat(statusOf(id)).isEqualTo("OPEN");
+        assertThat(redisTemplate.opsForValue().get(GroupPurchaseRedisKeys.status(id))).isEqualTo("CLOSED");
+    }
+
+    @Test
+    @DisplayName("스케줄러는 DB의 JOINED 수가 정원 이상인 OPEN 공동구매를 마감 전에도 정산한다")
+    void scheduler_settlesFilledOpen() {
+        GroupPurchase groupPurchase = saveGroupPurchase(LocalDateTime.now(clock).plusDays(3).withNano(0), 2);
+        groupPurchaseRedisRepository.initialize(GroupPurchaseCreatedEvent.from(groupPurchase));
+        Long id = groupPurchase.getId();
+        groupPurchaseRedisRepository.join(id, buyer1.getId());
+        groupPurchaseRedisRepository.join(id, buyer2.getId());
+        saveJoined(groupPurchase, buyer1);
+        saveJoined(groupPurchase, buyer2);
+
+        settlementScheduler.settleDueGroupPurchases();
+
+        Map<String, Object> row = groupPurchaseRow(id);
+        assertThat(row.get("status")).isEqualTo("CLOSED");
+        assertThat(row.get("final_headcount")).isEqualTo(2);
+    }
+
+    private GroupPurchase saveBrokenGroupPurchase(LocalDateTime now) {
+        GroupPurchase broken = saveGroupPurchase(now.plusDays(3), 50);
+        groupPurchaseRedisRepository.initialize(GroupPurchaseCreatedEvent.from(broken));
+        jdbcTemplate.update("UPDATE group_purchase SET close_at = ? WHERE id = ?",
+                now.minusHours(2), broken.getId());
+        redisTemplate.delete(GroupPurchaseRedisKeys.status(broken.getId()));
+        redisTemplate.delete(GroupPurchaseRedisKeys.headcount(broken.getId()));
+        return broken;
+    }
+
+    private void saveJoined(GroupPurchase groupPurchase, Member member) {
+        participationRepository.save(Participation.builder()
+                .groupPurchase(groupPurchase)
+                .member(member)
+                .quantity(1)
+                .joinedAt(LocalDateTime.now(clock))
+                .build());
+    }
+
     private String statusOf(Long groupPurchaseId) {
         return jdbcTemplate.queryForObject(
                 "SELECT status FROM group_purchase WHERE id = ?", String.class, groupPurchaseId);
+    }
+
+    private Integer failCountOf(Long groupPurchaseId) {
+        return jdbcTemplate.queryForObject(
+                "SELECT settle_fail_count FROM group_purchase WHERE id = ?", Integer.class, groupPurchaseId);
+    }
+
+    private LocalDateTime nextSettleAtOf(Long groupPurchaseId) {
+        return jdbcTemplate.queryForObject(
+                "SELECT next_settle_at FROM group_purchase WHERE id = ?", LocalDateTime.class, groupPurchaseId);
     }
 
     private Map<String, Object> groupPurchaseRow(Long groupPurchaseId) {
