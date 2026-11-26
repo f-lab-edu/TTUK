@@ -5,6 +5,7 @@ import com.ttuk.global.error.ErrorCode;
 import com.ttuk.grouppurchase.GroupPurchase;
 import com.ttuk.grouppurchase.GroupPurchaseRepository;
 import com.ttuk.grouppurchase.GroupPurchaseStatus;
+import com.ttuk.grouppurchase.event.GroupPurchaseCreatedEvent;
 import com.ttuk.grouppurchase.redis.CancelResult;
 import com.ttuk.grouppurchase.redis.GroupPurchaseRedisRepository;
 import com.ttuk.grouppurchase.redis.JoinOutcome;
@@ -17,6 +18,7 @@ import org.springframework.stereotype.Service;
 
 import java.time.Clock;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 
 @Slf4j
@@ -100,7 +102,8 @@ public class ParticipationService {
             throw new BusinessException(ErrorCode.GROUP_PURCHASE_NOT_OPEN);
         }
 
-        groupPurchaseRedisRepository.initialize(groupPurchase);
+        List<Long> joinedMemberIds = participationRepository.findJoinedMemberIds(groupPurchaseId);
+        groupPurchaseRedisRepository.restore(GroupPurchaseCreatedEvent.from(groupPurchase), joinedMemberIds);
         return groupPurchaseRedisRepository.join(groupPurchaseId, memberId);
     }
 

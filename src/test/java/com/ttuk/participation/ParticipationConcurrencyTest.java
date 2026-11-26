@@ -7,6 +7,7 @@ import com.ttuk.grouppurchase.DiscountPolicy;
 import com.ttuk.grouppurchase.DiscountType;
 import com.ttuk.grouppurchase.GroupPurchase;
 import com.ttuk.grouppurchase.GroupPurchaseRepository;
+import com.ttuk.grouppurchase.event.GroupPurchaseCreatedEvent;
 import com.ttuk.grouppurchase.redis.GroupPurchaseRedisKeys;
 import com.ttuk.grouppurchase.redis.GroupPurchaseRedisRepository;
 import com.ttuk.member.Member;
@@ -107,7 +108,7 @@ class ParticipationConcurrencyTest {
     void join_sameMemberConcurrently_onlyOnceSucceeds() throws Exception {
         GroupPurchase groupPurchase = saveGroupPurchase(50);
         Long id = groupPurchase.getId();
-        groupPurchaseRedisRepository.initialize(groupPurchase);
+        groupPurchaseRedisRepository.initialize(GroupPurchaseCreatedEvent.from(groupPurchase));
         Member buyer = saveBuyers(1).get(0);
 
         List<Callable<Boolean>> tasks = new ArrayList<>();
