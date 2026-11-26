@@ -7,12 +7,13 @@ import java.util.List;
 import java.util.Set;
 
 public record SettlementSnapshot(
-        boolean open,
+        boolean settleable,
         int headcount,
         int price,
         Set<Long> participantIds
 ) {
     public static SettlementSnapshot from(Long groupPurchaseId, List<String> scriptResult) {
+        String status = scriptResult.get(0);
         String headcount = scriptResult.get(1);
         String price = scriptResult.get(2);
         if (headcount.isEmpty() || price.isEmpty()) {
@@ -23,8 +24,10 @@ public record SettlementSnapshot(
         for (String memberId : scriptResult.subList(3, scriptResult.size())) {
             participantIds.add(Long.valueOf(memberId));
         }
+        boolean settleable = !GroupPurchaseStatus.OPEN.name().equals(status)
+                && !GroupPurchaseStatus.CANCELED.name().equals(status);
         return new SettlementSnapshot(
-                GroupPurchaseStatus.OPEN.name().equals(scriptResult.get(0)),
+                settleable,
                 Integer.parseInt(headcount),
                 Integer.parseInt(price),
                 Set.copyOf(participantIds));
