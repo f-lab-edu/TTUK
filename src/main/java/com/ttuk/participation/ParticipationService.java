@@ -15,6 +15,7 @@ import com.ttuk.member.MemberRepository;
 import com.ttuk.participation.dto.ParticipationCreateResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 
 import java.time.Clock;
@@ -119,6 +120,10 @@ public class ParticipationService {
         return groupPurchaseRedisRepository.join(groupPurchaseId, memberId);
     }
 
+    // Redis Lua가 중복 참여를 먼저 막으므로, 저장 중 같은 회원의 JOINED가 이미 있다는 건
+    // Redis 참여자에 빠져 있던 기존 참여자가 Lua를 통과한 경우다. 이때 Redis에 들어간 참여는
+    // 오히려 DB와 맞는 상태라 되돌리지 않고, 사용자에게는 이미 참여 중이라고 응답한다.
+    // 그 밖의 저장 실패는 실패한 요청이 자리를 차지하지 않도록 Redis 참여를 되돌린다.
     private ParticipationCreateResponse saveParticipation(Long groupPurchaseId, Long memberId,
                                                           int quantity, JoinResult result) {
         try {
@@ -128,11 +133,28 @@ public class ParticipationService {
                     .quantity(quantity)
                     .joinedAt(LocalDateTime.now(clock))
                     .build());
+        } catch (DataIntegrityViolationException e) {
+            if (alreadyJoinedInDb(groupPurchaseId, memberId, e)) {
+                log.warn("참여 저장: DB에 이미 JOINED 참여가 있음. Redis 참여자에 빠져 있던 회원으로 보고 Redis는 그대로 둠. "
+                        + "groupPurchaseId={}, memberId={}", groupPurchaseId, memberId);
+                throw new BusinessException(ErrorCode.ALREADY_JOINED);
+            }
+            rollbackRedis(groupPurchaseId, memberId, e);
+            throw e;
         } catch (RuntimeException e) {
             rollbackRedis(groupPurchaseId, memberId, e);
             throw e;
         }
         return new ParticipationCreateResponse(result.headcount(), result.price());
+    }
+
+    private boolean alreadyJoinedInDb(Long groupPurchaseId, Long memberId, RuntimeException cause) {
+        try {
+            return participationRepository.existsJoined(groupPurchaseId, memberId);
+        } catch (RuntimeException checkFailure) {
+            cause.addSuppressed(checkFailure);
+            return false;
+        }
     }
 
     private void rollbackRedis(Long groupPurchaseId, Long memberId, RuntimeException cause) {

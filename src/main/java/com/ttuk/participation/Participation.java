@@ -16,6 +16,9 @@ import java.time.LocalDateTime;
 @Entity
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
+@Table(uniqueConstraints = @UniqueConstraint(
+        name = "uk_participation_joined_member",
+        columnNames = {"group_purchase_id", "joined_member_id"}))
 public class Participation extends BaseTimeEntity {
 
     @Id
@@ -29,7 +32,7 @@ public class Participation extends BaseTimeEntity {
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "member_id",
-                foreignKey = @ForeignKey(name = "fk_participation_member"))
+            foreignKey = @ForeignKey(name = "fk_participation_member"))
     private Member member;
 
     @Column(nullable = false)
@@ -44,6 +47,14 @@ public class Participation extends BaseTimeEntity {
     private LocalDateTime joinedAt;
 
     private LocalDateTime canceledAt;
+
+    // JOINED일 때만 member_id, 그 외에는 NULL인 DB 계산 컬럼.
+    // (group_purchase_id, joined_member_id) 유니크로 같은 회원의 JOINED를 하나로 제한하고,
+    // NULL은 서로 중복으로 보지 않아 취소 기록은 여러 개 남길 수 있다.
+    @Column(name = "joined_member_id",
+            columnDefinition = "bigint generated always as (case when status = 'JOINED' then member_id end) virtual",
+            insertable = false, updatable = false)
+    private Long joinedMemberId;
 
     @Builder
     private Participation(GroupPurchase groupPurchase, Member member, int quantity, LocalDateTime joinedAt) {
