@@ -8,11 +8,14 @@ import com.ttuk.grouppurchase.redis.JoinResult;
 import com.ttuk.member.MemberRepository;
 import com.ttuk.participation.dto.ParticipationCreateResponse;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 
 import java.time.Clock;
 import java.time.LocalDateTime;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class ParticipationService {
@@ -36,14 +39,26 @@ public class ParticipationService {
         };
     }
 
+    // Redis Lua가 중복 참여를 먼저 막으므로, 여기서 같은 회원의 JOINED가 이미 있다는 건
+    // Redis 참여자에 빠져 있던 기존 참여자가 Lua를 통과한 경우다. 이때 Redis에 들어간 참여는
+    // 오히려 DB와 맞는 상태라 되돌리지 않고, 사용자에게는 이미 참여 중이라고 응답한다.
     private ParticipationCreateResponse saveParticipation(Long groupPurchaseId, Long memberId,
                                                           int quantity, JoinResult result) {
-        participationRepository.save(Participation.builder()
-                .groupPurchase(groupPurchaseRepository.getReferenceById(groupPurchaseId))
-                .member(memberRepository.getReferenceById(memberId))
-                .quantity(quantity)
-                .joinedAt(LocalDateTime.now(clock))
-                .build());
+        try {
+            participationRepository.save(Participation.builder()
+                    .groupPurchase(groupPurchaseRepository.getReferenceById(groupPurchaseId))
+                    .member(memberRepository.getReferenceById(memberId))
+                    .quantity(quantity)
+                    .joinedAt(LocalDateTime.now(clock))
+                    .build());
+        } catch (DataIntegrityViolationException e) {
+            if (participationRepository.existsJoined(groupPurchaseId, memberId)) {
+                log.warn("참여 저장: DB에 이미 JOINED 참여가 있음. Redis 참여자에 빠져 있던 회원으로 보고 Redis는 그대로 둠. "
+                        + "groupPurchaseId={}, memberId={}", groupPurchaseId, memberId);
+                throw new BusinessException(ErrorCode.ALREADY_JOINED);
+            }
+            throw e;
+        }
 
         return new ParticipationCreateResponse(result.headcount(), result.price());
     }
