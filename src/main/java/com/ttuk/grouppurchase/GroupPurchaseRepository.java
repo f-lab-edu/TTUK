@@ -77,7 +77,7 @@ public interface GroupPurchaseRepository extends JpaRepository<GroupPurchase, Lo
                             @Param("now") LocalDateTime now);
 
     @Transactional
-    @Modifying
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("""
             update GroupPurchase g
                set g.status = com.ttuk.grouppurchase.GroupPurchaseStatus.CANCELED,
