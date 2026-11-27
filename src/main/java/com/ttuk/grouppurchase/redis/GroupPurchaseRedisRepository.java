@@ -56,6 +56,10 @@ public class GroupPurchaseRedisRepository {
     private static final RedisScript<Long> REOPEN_GROUP_PURCHASE_SCRIPT =
             RedisScript.of(new ClassPathResource("redis/reopen_group_purchase.lua"), Long.class);
 
+    @SuppressWarnings("rawtypes")
+    private static final RedisScript<List> BROADCAST_STATE_SCRIPT =
+            RedisScript.of(new ClassPathResource("redis/take_broadcast_state.lua"), List.class);
+
 
     public boolean initialize(GroupPurchaseCreatedEvent event) {
         return createKeys(event, Set.of());
@@ -194,6 +198,26 @@ public class GroupPurchaseRedisRepository {
         Long result = redisTemplate.execute(REOPEN_GROUP_PURCHASE_SCRIPT,
                 List.of(GroupPurchaseRedisKeys.status(groupPurchaseId)));
         return Long.valueOf(1L).equals(result);
+
+    }
+
+    public Optional<GroupPurchaseLiveState> takeBroadcastState(Long groupPurchaseId) {
+
+        List<String> keys = List.of(
+                GroupPurchaseRedisKeys.meta(groupPurchaseId),
+                GroupPurchaseRedisKeys.headcount(groupPurchaseId),
+                GroupPurchaseRedisKeys.price(groupPurchaseId),
+                GroupPurchaseRedisKeys.status(groupPurchaseId),
+                GroupPurchaseRedisKeys.version(groupPurchaseId));
+
+        @SuppressWarnings("unchecked")
+        List<String> result = redisTemplate.execute(BROADCAST_STATE_SCRIPT, keys);
+
+        if(result.isEmpty()){
+            return Optional.empty();
+        }
+
+        return Optional.of(GroupPurchaseLiveState.from(groupPurchaseId, result));
 
     }
 
