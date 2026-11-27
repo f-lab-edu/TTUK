@@ -25,6 +25,10 @@ public final class GroupPurchaseRedisKeys {
         return key(groupPurchaseId, "status");
     }
 
+    public static String version(Long groupPurchaseId) {
+        return key(groupPurchaseId, "version");
+    }
+
     private static String key(Long groupPurchaseId, String field) {
         return "group_purchase:{" + groupPurchaseId + "}:" + field;
     }
